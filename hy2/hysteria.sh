@@ -199,8 +199,8 @@ inst_pwd(){
 }
 
 inst_site(){
-    read -rp "请输入 Hysteria 2 的伪装网站地址 （去除https://） [回车世嘉maimai日本网站]：" proxysite
-    [[ -z $proxysite ]] && proxysite="maimai.sega.jp"
+    read -rp "请输入 Hysteria 2 的伪装网站地址 （去除https://） [回车www.cloud.com]：" proxysite
+    [[ -z $proxysite ]] && proxysite="www.icloud.com"
     yellow "使用在 Hysteria 2 节点的伪装网站为：$proxysite"
 }
 
@@ -523,13 +523,7 @@ menu() {
     clear
     echo "#############################################################"
     echo -e "#                  ${RED}Hysteria 2 一键安装脚本${PLAIN}                #"
-    echo -e "# ${GREEN}作者${PLAIN}: AMCTEAMS AMC跨境社区                            #"
-    echo -e "# ${GREEN}博客${PLAIN}: https://www.tkstart.com                        #"
     echo -e "# ${GREEN}GitHub 项目${PLAIN}: https://github.com/amcteams             #"
-    echo -e "# ${GREEN}GitLab 项目${PLAIN}: https://gitlab.com/amcteams             #"
-    echo -e "# ${GREEN}Telegram 频道${PLAIN}: https://t.me/amcteams                 #"
-    echo -e "# ${GREEN}Telegram 群组${PLAIN}: https://t.me/+OpogS1V6Q8dlOWVh        #"
-    echo -e "# ${GREEN}YouTube 频道${PLAIN}: https://www.youtube.com/@amcteams      #"
     echo "#############################################################"
     echo ""
     echo -e " ${GREEN}1.${PLAIN} 安装 Hysteria 2"
