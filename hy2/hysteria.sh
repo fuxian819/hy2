@@ -199,7 +199,7 @@ inst_pwd(){
 }
 
 inst_site(){
-    read -rp "请输入 Hysteria 2 的伪装网站地址 （去除https://） [回车www.cloud.com]：" proxysite
+    read -rp "请输入 Hysteria 2 的伪装网站地址 （去除https://） [回车www.icloud.com]：" proxysite
     [[ -z $proxysite ]] && proxysite="www.icloud.com"
     yellow "使用在 Hysteria 2 节点的伪装网站为：$proxysite"
 }
