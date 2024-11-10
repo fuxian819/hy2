@@ -300,7 +300,7 @@ socks5:
 
 transport:
   udp:
-    hopInterval: 30s 
+    hopInterval: 10s 
 EOF
     cat << EOF > /root/hy/hy-client.json
 {
@@ -322,7 +322,7 @@ EOF
   },
   "transport": {
     "udp": {
-      "hopInterval": "30s"
+      "hopInterval": "10s"
     }
   }
 }
