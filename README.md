@@ -1,4 +1,4 @@
-# Hy2-script
+# Hy2-script自用，有修改！！！
 Hy2 协议一键部署脚本
 
 ```shell
