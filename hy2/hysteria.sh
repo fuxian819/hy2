@@ -266,13 +266,18 @@ masquerade:
     rewriteHost: true
 EOF
 
-    # 确定最终入站端口范围
+    # 确定最终入站端口范围--ur1
     if [[ -n $firstport ]]; then
         last_port="$port,$firstport-$endport"
     else
         last_port=$port
     fi
-
+    # 确定最终入站端口范围--ur2
+    if [[ -n $firstport ]]; then
+        port_range="$firstport-$endport"
+    else
+        last_port=$port
+    fi
     # 给 IPv6 地址加中括号
     if [[ -n $(echo $ip | grep ":") ]]; then
         last_ip="[$ip]"
@@ -291,10 +296,13 @@ tls:
   insecure: true
 
 quic:
-  initStreamReceiveWindow: 16777216
-  maxStreamReceiveWindow: 16777216
-  initConnReceiveWindow: 33554432
-  maxConnReceiveWindow: 33554432
+  initStreamReceiveWindow: 8388608 
+  maxStreamReceiveWindow: 8388608 
+  initConnReceiveWindow: 20971520 
+  maxConnReceiveWindow: 20971520 
+  maxIdleTimeout: 30s 
+  maxIncomingStreams: 1024 
+  disablePathMTUDiscovery: false
 
 fastOpen: true
 
@@ -364,7 +372,7 @@ rules:
   - MATCH,Proxy
 EOF
     url="hysteria2://$auth_pwd@$last_ip:$last_port/?insecure=1&sni=$hy_domain#Misaka-Hysteria2"
-    ur2="hysteria2://$auth_pwd@$last_ip:$port/?sni=$hy_domain&peer=$last_ip&insecure=1&mport=$last_port#xian"
+    ur2="hysteria2://$auth_pwd@$last_ip:$port/?sni=$hy_domain&peer=$last_ip&insecure=1&mport=$port_range#xian"
     echo $url > /root/hy/url.txt
     echo $ur2 > /root/hy/url.txt
 
@@ -523,6 +531,7 @@ showconf(){
     yellow "Clash Meta 客户端配置文件已保存到 /root/hy/clash-meta.yaml"
     yellow "Hysteria 2 节点分享链接如下，并保存到 /root/hy/url.txt"
     red "$(cat /root/hy/url.txt)"
+    red "$(cat /root/hy/ur2.txt)"
 }
 
 menu() {
