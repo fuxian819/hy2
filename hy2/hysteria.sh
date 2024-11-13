@@ -387,7 +387,7 @@ EOF
     yellow "Clash Meta 客户端配置文件已保存到 /root/hy/clash-meta.yaml"
     yellow "Hysteria 2 节点分享链接如下，并保存到 /root/hy/ur1.txt"
     red "$(cat /root/hy/ur1.txt)"
-    red "$(cat /root/hy/ur2.txt)"
+    FUCHSIA "$(cat /root/hy/ur2.txt)"
 }
 
 unsthysteria(){
@@ -525,7 +525,7 @@ showconf(){
     yellow "Clash Meta 客户端配置文件已保存到 /root/hy/clash-meta.yaml"
     yellow "Hysteria 2 节点分享链接如下，并保存到 /root/hy/ur1.txt"
     red "$(cat /root/hy/ur1.txt)"
-    red "$(cat /root/hy/ur2.txt)"
+    FUCHSIA "$(cat /root/hy/ur2.txt)"
 }
 
 menu() {
