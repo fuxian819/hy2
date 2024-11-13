@@ -335,9 +335,9 @@ EOF
     red "======================================================================================"
     green "Hysteria 2 代理服务安装完成"
     yellow "Hysteria 2 客户端 YAML 配置文件 hy-client.yaml 内容如下，并保存到 /root/hy/hy-client.yaml"
-    yellow "Hysteria 2 节点分享链接如下，并保存到 /root/hy/ur1.txt"
-    red "$(cat /root/hy/ur1.txt)"
-    blue "$(cat /root/hy/ur2.txt)"
+    red "$(cat /root/hy/hy-client.yaml)"
+    yellow "Hysteria 2 节点分享链接如下，并保存到 /root/hy/ur2.txt"
+    green "$(cat /root/hy/ur2.txt)"
 }
 
 unsthysteria(){
