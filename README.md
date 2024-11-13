@@ -13,19 +13,19 @@ bash <(curl -fsSL https://get.hy2.sh/)
 
 bash <(curl -fsSL https://get.hy2.sh/) --remove
 
-#启动Hysteria2
+#启动Hy
 
 systemctl start hysteria-server.service
 
-#重启Hysteria2
+#重启Hy
 
 systemctl restart hysteria-server.service
 
-#查看Hysteria2状态
+#查看Hy
 
 systemctl status hysteria-server.service
 
-#停止Hysteria2
+#停止Hy
 
 systemctl stop hysteria-server.service
 
