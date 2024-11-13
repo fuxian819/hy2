@@ -308,7 +308,7 @@ quic:
   maxIdleTimeout: 90s 
   maxIncomingStreams: 1024 
   disablePathMTUDiscovery: false 
-
+  
 fastOpen: true
 
 socks5:
@@ -337,7 +337,7 @@ EOF
     yellow "Hysteria 2 客户端 YAML 配置文件 hy-client.yaml 内容如下，并保存到 /root/hy/hy-client.yaml"
     yellow "Hysteria 2 节点分享链接如下，并保存到 /root/hy/ur1.txt"
     red "$(cat /root/hy/ur1.txt)"
-    red "$(cat /root/hy/ur2.txt)"
+    blue "$(cat /root/hy/ur2.txt)"
 }
 
 unsthysteria(){
