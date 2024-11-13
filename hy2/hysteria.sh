@@ -373,8 +373,8 @@ rules:
 EOF
     url="hysteria2://$auth_pwd@$last_ip:$last_port/?insecure=1&sni=$hy_domain#Misaka-Hysteria2"
     ur2="hysteria2://$auth_pwd@$last_ip:$port/?sni=$hy_domain&peer=$last_ip&insecure=1&mport=$port_range#xian"
-    echo $url > /root/hy/url.txt
-    echo $ur2 > /root/hy/url.txt
+    echo $ur1 > /root/hy/ur1.txt
+    echo $ur2 > /root/hy/ur2.txt
 
     systemctl daemon-reload
     systemctl enable hysteria-server
@@ -391,8 +391,8 @@ EOF
     yellow "Hysteria 2 客户端 JSON 配置文件 hy-client.json 内容如下，并保存到 /root/hy/hy-client.json"
     red "$(cat /root/hy/hy-client.json)"
     yellow "Clash Meta 客户端配置文件已保存到 /root/hy/clash-meta.yaml"
-    yellow "Hysteria 2 节点分享链接如下，并保存到 /root/hy/url.txt"
-    red "$(cat /root/hy/url.txt)"
+    yellow "Hysteria 2 节点分享链接如下，并保存到 /root/hy/ur1.txt"
+    red "$(cat /root/hy/ur1.txt)"
     red "$(cat /root/hy/ur2.txt)"
 }
 
@@ -529,8 +529,8 @@ showconf(){
     yellow "Hysteria 2 客户端 JSON 配置文件 hy-client.json 内容如下，并保存到 /root/hy/hy-client.json"
     red "$(cat /root/hy/hy-client.json)"
     yellow "Clash Meta 客户端配置文件已保存到 /root/hy/clash-meta.yaml"
-    yellow "Hysteria 2 节点分享链接如下，并保存到 /root/hy/url.txt"
-    red "$(cat /root/hy/url.txt)"
+    yellow "Hysteria 2 节点分享链接如下，并保存到 /root/hy/ur1.txt"
+    red "$(cat /root/hy/ur1.txt)"
     red "$(cat /root/hy/ur2.txt)"
 }
 
