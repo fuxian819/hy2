@@ -263,11 +263,33 @@ bandwidth:
   up: 0 gbps
   down: 0 gbps
 
+speedTest: true
+
 masquerade:
   type: proxy
   proxy:
     url: https://$proxysite
     rewriteHost: true
+
+resolver:
+  type: tls  
+  tcp:
+    addr: 8.8.8.8:53 
+    timeout: 4s 
+  udp:
+    addr: 8.8.4.4:53 
+    timeout: 4s
+  tls:
+    addr: 1.1.1.1:853 
+    timeout: 10s
+    sni: cloudflare-dns.com 
+    insecure: false 
+  https:
+    addr: 1.1.1.1:443 
+    timeout: 10s
+    sni: cloudflare-dns.com
+    insecure: false
+
 EOF
 
     # 确定最终入站端口范围--ur1
@@ -301,12 +323,12 @@ tls:
   insecure: true
 
 quic:
-  initStreamReceiveWindow: 8388608
-  maxStreamReceiveWindow: 8388608
-  initConnReceiveWindow: 20971520
-  maxConnReceiveWindow: 20971520
+  initStreamReceiveWindow: 8388608 
+  maxStreamReceiveWindow: 8388608 
+  initConnReceiveWindow: 20971520 
+  maxConnReceiveWindow: 20971520 
   maxIdleTimeout: 90s 
-  maxIncomingStreams: 1024 
+  keepAlivePeriod: 10s 
   disablePathMTUDiscovery: false 
   
 fastOpen: true
