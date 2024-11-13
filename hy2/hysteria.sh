@@ -247,13 +247,10 @@ tls:
   key: $key_path
 
 quic:
-  initStreamReceiveWindow: 8388608 
-  maxStreamReceiveWindow: 8388608 
-  initConnReceiveWindow: 20971520 
-  maxConnReceiveWindow: 20971520 
-  maxIdleTimeout: 30s 
-  maxIncomingStreams: 1024 
-  disablePathMTUDiscovery: false
+  initStreamReceiveWindow: 16777216
+  maxStreamReceiveWindow: 16777216
+  initConnReceiveWindow: 33554432
+  maxConnReceiveWindow: 33554432
 
 auth:
   type: password
@@ -296,13 +293,10 @@ tls:
   insecure: true
 
 quic:
-  initStreamReceiveWindow: 8388608 
-  maxStreamReceiveWindow: 8388608 
-  initConnReceiveWindow: 20971520 
-  maxConnReceiveWindow: 20971520 
-  maxIdleTimeout: 30s 
-  maxIncomingStreams: 1024 
-  disablePathMTUDiscovery: false
+  initStreamReceiveWindow: 16777216
+  maxStreamReceiveWindow: 16777216
+  initConnReceiveWindow: 33554432
+  maxConnReceiveWindow: 33554432
 
 fastOpen: true
 
