@@ -500,7 +500,7 @@ showconf(){
 }
 
 update_hysteria(){
-    last_version=$(curl -Ls "https://api.github.com/repos/HyNetwork/apernet/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/') || last_version=v$(curl -Ls "https://data.jsdelivr.com/v1/package/resolve/gh/HyNetwork/Hysteria" | grep '"version":' | sed -E 's/.*"([^"]+)".*/\1/')
+    last_version=$(curl -Ls "https://api.github.com/repos/apernet/apernet/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/') || last_version=v$(curl -Ls "https://data.jsdelivr.com/v1/package/resolve/gh/HyNetwork/Hysteria" | grep '"version":' | sed -E 's/.*"([^"]+)".*/\1/')
     local_version=$(/usr/local/bin/hysteria -v | awk 'NR==1 {print $3}')
     if [[ $last_version == $local_version ]]; then
         red "您当前运行的 Hysteria 内核为官方最新版本，不必再次更新！"
