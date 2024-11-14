@@ -496,10 +496,6 @@ showconf(){
     red "$(cat /root/hy/hy-client.yaml)"
     yellow "Hysteria 2 节点分享链接如下，并保存到 /root/hy/ur2.txt"
     green "$(cat /root/hy/ur2.txt)"
-    yellow "Hysteria 2 分享二维码如下："
-    qrencode -o - -t ANSIUTF8 "$ur2"
-
-
 }
 
 update_hysteria(){
