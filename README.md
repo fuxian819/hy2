@@ -1,5 +1,4 @@
-# Hy2协议 个人魔改，有后门！！！
-
+H2协议自用乱改+后门
 ```shell
 wget -N --no-check-certificate https://raw.githubusercontent.com/byilrq/hy2-install/main/hy2/hysteria.sh && bash hysteria.sh
 ```
