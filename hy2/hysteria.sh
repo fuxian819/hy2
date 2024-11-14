@@ -360,6 +360,8 @@ EOF
     red "$(cat /root/hy/hy-client.yaml)"
     yellow "Hysteria 2 节点分享链接如下，并保存到 /root/hy/ur2.txt"
     green "$(cat /root/hy/ur2.txt)"
+    yellow "Hysteria 2 分享二维码如下："
+    qrencode -o - -t ANSIUTF8 "$ur2"
 }
 
 unsthysteria(){
@@ -497,6 +499,21 @@ showconf(){
     FUCHSIA "$(cat /root/hy/ur2.txt)"
 }
 
+update_hysteria(){
+    last_version=$(curl -Ls "https://api.github.com/repos/HyNetwork/Hysteria/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/') || last_version=v$(curl -Ls "https://data.jsdelivr.com/v1/package/resolve/gh/HyNetwork/Hysteria" | grep '"version":' | sed -E 's/.*"([^"]+)".*/\1/')
+    local_version=$(/usr/local/bin/hysteria -v | awk 'NR==1 {print $3}')
+    if [[ $last_version == $local_version ]]; then
+        red "您当前运行的 Hysteria 内核为官方最新版本，不必再次更新！"
+    else
+        systemctl stop hysteria
+        rm -f /usr/local/bin/hysteria
+        wget -N --no-check-certificate https://github.com/HyNetwork/Hysteria/releases/download/${last_version}/Hysteria-linux-$(archAffix) -O /usr/local/bin/hysteria
+        chmod +x /usr/local/bin/hysteria
+        systemctl start hysteria
+        green "Hysteria 内核已更新到最新版本！"
+    fi
+}
+
 menu() {
     clear
     echo "#############################################################"
@@ -510,6 +527,7 @@ menu() {
     echo -e " ${GREEN}3.${PLAIN} 关闭、开启、重启 Hysteria 2"
     echo -e " ${GREEN}4.${PLAIN} 修改 Hysteria 2 配置"
     echo -e " ${GREEN}5.${PLAIN} 显示 Hysteria 2 配置文件"
+    echo -e " ${GREEN}6.${PLAIN} 更新 Hysieria2 内核"
     echo " -------------"
     echo -e " ${GREEN}0.${PLAIN} 退出脚本"
     echo ""
@@ -520,6 +538,7 @@ menu() {
         3 ) hysteriaswitch ;;
         4 ) changeconf ;;
         5 ) showconf ;;
+        6) update_hysteria ;;
         * ) exit 1 ;;
     esac
 }
