@@ -499,6 +499,7 @@ showconf(){
     yellow "Hysteria 2 分享二维码如下："
     qrencode -o - -t ANSIUTF8 "$ur2"
 
+
 }
 
 update_hysteria(){
