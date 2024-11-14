@@ -361,9 +361,8 @@ EOF
     yellow "Hysteria 2 节点分享链接如下，并保存到 /root/hy/ur2.txt"
     green "$(cat /root/hy/ur2.txt)"
     yellow "Hysteria 2 分享二维码如下："
-    qrencode -o - -t ANSIUTF8 "$(cat /root/hy/ur2.txt)"
-
-}
+    green "$(cat /root/hy/ur2.txt)"
+ }
 
 unsthysteria(){
     systemctl stop hysteria-server.service >/dev/null 2>&1
@@ -497,6 +496,8 @@ showconf(){
     red "$(cat /root/hy/hy-client.yaml)"
     yellow "Hysteria 2 节点分享链接如下，并保存到 /root/hy/ur2.txt"
     green "$(cat /root/hy/ur2.txt)"
+    yellow "Hysteria 2 二维码如下"
+    qrencode -o - -t ANSIUTF8 "$(cat /root/hy/ur2.txt)"
 }
 
 update_hysteria(){
