@@ -538,7 +538,7 @@ menu() {
         3 ) hysteriaswitch ;;
         4 ) changeconf ;;
         5 ) showconf ;;
-        6) update_hysteria ;;
+        6 ) update_hysteria ;;
         * ) exit 1 ;;
     esac
 }
