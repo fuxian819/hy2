@@ -204,6 +204,18 @@ inst_site(){
     yellow "使用在 Hysteria 2 节点的伪装网站为：$proxysite"
 }
 
+inst_up(){
+    read -rp "请输入 家宽下载速度 mbps （去除https://） [回车:0]：" up_band
+    [[ -z $up_band ]] && up_band= 0
+    yellow "上行带宽设置为 $up_band
+}
+
+inst_down(){
+    read -rp "请输入 家宽上传速度 mbps （去除https://） [回车:0]：" down_band
+    [[ -z $down_band ]] && down_band= 0
+    yellow "上行带宽设置为 $down_band
+}
+
 insthysteria(){
     warpv6=$(curl -s6m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
     warpv4=$(curl -s4m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
@@ -260,8 +272,8 @@ auth:
   password: $auth_pwd
   
 bandwidth:
-  up: 0 gbps
-  down: 0 gbps
+  up: $up_band mbps
+  down: $down_band mbps
 
 speedTest: true
 
@@ -270,25 +282,6 @@ masquerade:
   proxy:
     url: https://$proxysite
     rewriteHost: true
-
-resolver:
-  type: tls  
-  tcp:
-    addr: 8.8.8.8:53 
-    timeout: 4s 
-  udp:
-    addr: 8.8.4.4:53 
-    timeout: 4s
-  tls:
-    addr: 1.1.1.1:853 
-    timeout: 10s
-    sni: cloudflare-dns.com 
-    insecure: false 
-  https:
-    addr: 1.1.1.1:443 
-    timeout: 10s
-    sni: cloudflare-dns.com
-    insecure: false
 
 EOF
 
