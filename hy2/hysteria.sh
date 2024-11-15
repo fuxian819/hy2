@@ -508,6 +508,17 @@ update_hysteria(){
     fi
 }
 
+update_core(){
+    systemctl stop hysteria
+    rm -f /usr/local/bin/hysteria
+    wget -N https://raw.githubusercontent.com/byilrq/hy2-install/main/hy2/install_server.sh
+    bash install_server.sh
+    rm -f install_server.sh
+    green "Hysteria 内核已更新到最新版本！"
+    systemctl start hysteria
+    green "Hysteria 内核已经重新启动"
+}
+
 menu() {
     clear
     echo "#############################################################"
@@ -520,7 +531,8 @@ menu() {
     echo -e " ${GREEN}3.${PLAIN} 关闭、开启、重启 Hysteria 2"
     echo -e " ${GREEN}4.${PLAIN} 修改 Hysteria 2 配置"
     echo -e " ${GREEN}5.${PLAIN} 显示 Hysteria 2 配置文件"
-    echo -e " ${GREEN}6.${PLAIN} 更新 Hysieria2 内核"
+    echo -e " ${GREEN}6.${PLAIN} 更新 Hysieria2 内核方式1"
+    echo -e " ${GREEN}7.${PLAIN} 更新 Hysieria2 内核方式2（测试版）"
     echo " -------------"
     echo -e " ${GREEN}0.${PLAIN} 退出脚本"
     echo ""
@@ -532,6 +544,7 @@ menu() {
         4 ) changeconf ;;
         5 ) showconf ;;
         6 ) update_hysteria ;;
+        7 ) update_core ;;
         * ) exit 1 ;;
     esac
 }
