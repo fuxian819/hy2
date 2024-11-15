@@ -361,7 +361,7 @@ EOF
     yellow "Hysteria 2 节点分享链接如下，并保存到 /root/hy/ur2.txt"
     green "$(cat /root/hy/ur2.txt)"
     yellow "Hysteria 2 分享二维码如下："
-    green "$(cat /root/hy/ur2.txt)"
+    qrencode -o - -t ANSIUTF8 "$(cat /root/hy/ur2.txt)"
  }
 
 unsthysteria(){
