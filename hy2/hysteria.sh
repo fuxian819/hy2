@@ -52,18 +52,6 @@ realip(){
     ip=$(curl -s4m8 ip.sb -k) || ip=$(curl -s6m8 ip.sb -k)
 }
 
-inst_up(){
-    read -rp "请输入 家宽下载速度 mbps  [回车:0]：" up_band
-    [[ -z $up_band ]] && up_band=0
-    yellow "上行带宽设置为 $up_band"
-}
-
-inst_down(){
-    read -rp "请输入 家宽上传速度 mbps  [回车:0]：" down_band
-    [[ -z $down_band ]] && down_band=0
-    yellow "上行带宽设置为 $down_band"
-}
-
 inst_cert(){
     green "Hysteria 2 协议证书申请方式如下："
     echo ""
@@ -272,8 +260,8 @@ auth:
   password: $auth_pwd
   
 bandwidth:
-  up: $up_band mbps
-  down: $down_band mbps
+  up: 500 mbps
+  down: 50 mbps
 
 speedTest: true
 
