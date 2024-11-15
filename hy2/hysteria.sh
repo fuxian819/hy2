@@ -491,8 +491,9 @@ update_hysteria(){
         rm -f /usr/local/bin/hysteria
         wget -N --no-check-certificate https://github.com/apernet/Hysteria/releases/download/${last_version}/Hysteria-linux-$(archAffix) -O /usr/local/bin/hysteria
         chmod +x /usr/local/bin/hysteria
+        green "Hysteria 内核已更新到最新版本！"        
         systemctl start hysteria
-        green "Hysteria 内核已更新到最新版本！"
+        green "Hysteria 内核已重新启动！"
     fi
 }
 
@@ -519,8 +520,8 @@ menu() {
     echo -e " ${GREEN}3.${PLAIN} 关闭、开启、重启 Hysteria 2"
     echo -e " ${GREEN}4.${PLAIN} 修改 Hysteria 2 配置"
     echo -e " ${GREEN}5.${PLAIN} 显示 Hysteria 2 配置文件"
-    echo -e " ${GREEN}6.${PLAIN} 更新 Hysieria2 内核方式1"
-    echo -e " ${GREEN}7.${PLAIN} 更新 Hysieria2 内核方式2（测试版）"
+    echo -e " ${GREEN}6.${PLAIN} 更新 Hysieria2 内核方式1（？）"
+    echo -e " ${GREEN}7.${PLAIN} 更新 Hysieria2 内核方式2（ok）"
     echo " -------------"
     echo -e " ${GREEN}0.${PLAIN} 退出脚本"
     echo ""
