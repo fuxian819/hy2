@@ -1,810 +1,1074 @@
-#!/bin/bash
+#!/usr/bin/env bash
+#
+# install_server.sh - hysteria server install script
+# Try `install_server.sh --help` for usage.
+#
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2023 Aperture Internet Laboratory
+#
 
-export LANG=en_US.UTF-8
+set -e
 
-RED="\033[31m"
-GREEN="\033[32m"
-YELLOW="\033[33m"
-PLAIN="\033[0m"
 
-red(){
-    echo -e "\033[31m\033[01m$1\033[0m"
+###
+# SCRIPT CONFIGURATION
+###
+
+# Basename of this script
+SCRIPT_NAME="$(basename "$0")"
+
+# Command line arguments of this script
+SCRIPT_ARGS=("$@")
+
+# Path for installing executable
+EXECUTABLE_INSTALL_PATH="/usr/local/bin/hysteria"
+
+# Paths to install systemd files
+SYSTEMD_SERVICES_DIR="/etc/systemd/system"
+
+# Directory to store hysteria config file
+CONFIG_DIR="/etc/hysteria"
+
+# URLs of GitHub
+REPO_URL="https://github.com/apernet/hysteria"
+API_BASE_URL="https://api.github.com/repos/apernet/hysteria"
+
+# curl command line flags.
+# To using a proxy, please specify ALL_PROXY in the environ variable, such like:
+# export ALL_PROXY=socks5h://192.0.2.1:1080
+CURL_FLAGS=(-L -f -q --retry 5 --retry-delay 10 --retry-max-time 60)
+
+
+###
+# AUTO DETECTED GLOBAL VARIABLE
+###
+
+# Package manager
+PACKAGE_MANAGEMENT_INSTALL="${PACKAGE_MANAGEMENT_INSTALL:-}"
+
+# Operating System of current machine, supported: linux
+OPERATING_SYSTEM="${OPERATING_SYSTEM:-}"
+
+# Architecture of current machine, supported: 386, amd64, arm, arm64, mipsle, s390x
+ARCHITECTURE="${ARCHITECTURE:-}"
+
+# User for running hysteria
+HYSTERIA_USER="${HYSTERIA_USER:-}"
+
+# Directory for ACME certificates storage
+HYSTERIA_HOME_DIR="${HYSTERIA_HOME_DIR:-}"
+
+
+###
+# ARGUMENTS
+###
+
+# Supported operation: install, remove, check_update
+OPERATION=
+
+# User specified version to install
+VERSION=
+
+# Force install even if installed
+FORCE=
+
+# User specified binary to install
+LOCAL_FILE=
+
+
+###
+# COMMAND REPLACEMENT & UTILITIES
+###
+
+has_command() {
+  local _command=$1
+
+  type -P "$_command" > /dev/null 2>&1
 }
 
-green(){
-    echo -e "\033[32m\033[01m$1\033[0m"
+curl() {
+  command curl "${CURL_FLAGS[@]}" "$@"
 }
 
-yellow(){
-    echo -e "\033[33m\033[01m$1\033[0m"
+mktemp() {
+  command mktemp "$@" "/tmp/hyservinst.XXXXXXXXXX"
 }
 
-# 判断系统及定义系统安装依赖方式
-REGEX=("debian" "ubuntu" "centos|red hat|kernel|oracle linux|alma|rocky" "'amazon linux'" "fedora")
-RELEASE=("Debian" "Ubuntu" "CentOS" "CentOS" "Fedora")
-PACKAGE_UPDATE=("apt-get update" "apt-get update" "yum -y update" "yum -y update" "yum -y update")
-PACKAGE_INSTALL=("apt -y install" "apt -y install" "yum -y install" "yum -y install" "yum -y install")
-PACKAGE_REMOVE=("apt -y remove" "apt -y remove" "yum -y remove" "yum -y remove" "yum -y remove")
-PACKAGE_UNINSTALL=("apt -y autoremove" "apt -y autoremove" "yum -y autoremove" "yum -y autoremove" "yum -y autoremove")
+tput() {
+  if has_command tput; then
+    command tput "$@"
+  fi
+}
 
-[[ $EUID -ne 0 ]] && red "注意: 请在root用户下运行脚本" && exit 1
+tred() {
+  tput setaf 1
+}
 
-CMD=("$(grep -i pretty_name /etc/os-release 2>/dev/null | cut -d \" -f2)" "$(hostnamectl 2>/dev/null | grep -i system | cut -d : -f2)" "$(lsb_release -sd 2>/dev/null)" "$(grep -i description /etc/lsb-release 2>/dev/null | cut -d \" -f2)" "$(grep . /etc/redhat-release 2>/dev/null)" "$(grep . /etc/issue 2>/dev/null | cut -d \\ -f1 | sed '/^[ ]*$/d')")
+tgreen() {
+  tput setaf 2
+}
 
-for i in "${CMD[@]}"; do
-    SYS="$i" && [[ -n $SYS ]] && break
-done
+tyellow() {
+  tput setaf 3
+}
 
-for ((int = 0; int < ${#REGEX[@]}; int++)); do
-    [[ $(echo "$SYS" | tr '[:upper:]' '[:lower:]') =~ ${REGEX[int]} ]] && SYSTEM="${RELEASE[int]}" && [[ -n $SYSTEM ]] && break
-done
+tblue() {
+  tput setaf 4
+}
 
-[[ -z $SYSTEM ]] && red "目前暂不支持你的VPS的操作系统！" && exit 1
+taoi() {
+  tput setaf 6
+}
 
-if [[ -z $(type -P curl) ]]; then
-    if [[ ! $SYSTEM == "CentOS" ]]; then
-        ${PACKAGE_UPDATE[int]}
+tbold() {
+  tput bold
+}
+
+treset() {
+  tput sgr0
+}
+
+note() {
+  local _msg="$1"
+
+  echo -e "$SCRIPT_NAME: $(tbold)note: $_msg$(treset)"
+}
+
+warning() {
+  local _msg="$1"
+
+  echo -e "$SCRIPT_NAME: $(tyellow)warning: $_msg$(treset)"
+}
+
+error() {
+  local _msg="$1"
+
+  echo -e "$SCRIPT_NAME: $(tred)error: $_msg$(treset)"
+}
+
+has_prefix() {
+    local _s="$1"
+    local _prefix="$2"
+
+    if [[ -z "$_prefix" ]]; then
+        return 0
     fi
-    ${PACKAGE_INSTALL[int]} curl
-fi
 
-realip(){
-    ip=$(curl -s4m8 ip.sb -k) || ip=$(curl -s6m8 ip.sb -k)
+    if [[ -z "$_s" ]]; then
+        return 1
+    fi
+
+    [[ "x$_s" != "x${_s#"$_prefix"}" ]]
 }
 
-inst_cert(){
-    green "Hysteria 协议证书申请方式如下："
-    echo ""
-    echo -e " ${GREEN}1.${PLAIN} 自签证书 ${YELLOW}（默认）${PLAIN}"
-    echo -e " ${GREEN}2.${PLAIN} Acme 脚本自动申请"
-    echo -e " ${GREEN}3.${PLAIN} 自定义证书路径"
-    echo ""
-    read -rp "请输入选项 [1-3]: " certInput
-    if [[ $certInput == 2 ]]; then
-        cert_path="/root/cert.crt"
-        key_path="/root/private.key"
+generate_random_password() {
+  dd if=/dev/random bs=18 count=1 status=none | base64
+}
 
-        chmod a+x /root # 让 Hysteria 主程序访问到 /root 目录
+systemctl() {
+  if [[ "x$FORCE_NO_SYSTEMD" == "x2" ]] || ! has_command systemctl; then
+    warning "Ignored systemd command: systemctl $@"
+    return
+  fi
 
-        if [[ -f /root/cert.crt && -f /root/private.key ]] && [[ -s /root/cert.crt && -s /root/private.key ]] && [[ -f /root/ca.log ]]; then
-            domain=$(cat /root/ca.log)
-            green "检测到原有域名：$domain 的证书，正在应用"
-            hy_domain=$domain
-        else
-            wget -N https://gitlab.com/Misaka-blog/acme-script/-/raw/main/acme.sh && bash acme.sh
-            
-            if [[ -f /root/cert.crt && -f /root/private.key ]] && [[ -s /root/cert.crt && -s /root/private.key ]] && [[ -f /root/ca.log ]]; then
-                domain=$(cat /root/ca.log)
-                hy_domain=$domain
-            else
-                red "证书申请失败，脚本退出" && exit
-            fi
+  command systemctl "$@"
+}
+
+show_argument_error_and_exit() {
+  local _error_msg="$1"
+
+  error "$_error_msg"
+  echo "Try \"$0 --help\" for usage." >&2
+  exit 22
+}
+
+install_content() {
+  local _install_flags="$1"
+  local _content="$2"
+  local _destination="$3"
+  local _overwrite="$4"
+
+  local _tmpfile="$(mktemp)"
+
+  echo -ne "Install $_destination ... "
+  echo "$_content" > "$_tmpfile"
+  if [[ -z "$_overwrite" && -e "$_destination" ]]; then
+    echo -e "exists"
+  elif install "$_install_flags" "$_tmpfile" "$_destination"; then
+    echo -e "ok"
+  fi
+
+  rm -f "$_tmpfile"
+}
+
+remove_file() {
+  local _target="$1"
+
+  echo -ne "Remove $_target ... "
+  if rm "$_target"; then
+    echo -e "ok"
+  fi
+}
+
+exec_sudo() {
+  # exec sudo with configurable environ preserved.
+  local _saved_ifs="$IFS"
+  IFS=$'\n'
+  local _preserved_env=(
+    $(env | grep "^PACKAGE_MANAGEMENT_INSTALL=" || true)
+    $(env | grep "^OPERATING_SYSTEM=" || true)
+    $(env | grep "^ARCHITECTURE=" || true)
+    $(env | grep "^HYSTERIA_\w*=" || true)
+    $(env | grep "^FORCE_\w*=" || true)
+  )
+  IFS="$_saved_ifs"
+
+  exec sudo env \
+    "${_preserved_env[@]}" \
+    "$@"
+}
+
+detect_package_manager() {
+  if [[ -n "$PACKAGE_MANAGEMENT_INSTALL" ]]; then
+    return 0
+  fi
+
+  if has_command apt; then
+    PACKAGE_MANAGEMENT_INSTALL='apt -y --no-install-recommends install'
+    return 0
+  fi
+
+  if has_command dnf; then
+    PACKAGE_MANAGEMENT_INSTALL='dnf -y install'
+    return 0
+  fi
+
+  if has_command yum; then
+    PACKAGE_MANAGEMENT_INSTALL='yum -y install'
+    return 0
+  fi
+
+  if has_command zypper; then
+    PACKAGE_MANAGEMENT_INSTALL='zypper install -y --no-recommends'
+    return 0
+  fi
+
+  if has_command pacman; then
+    PACKAGE_MANAGEMENT_INSTALL='pacman -Syu --noconfirm'
+    return 0
+  fi
+
+  return 1
+}
+
+install_software() {
+  local _package_name="$1"
+
+  if ! detect_package_manager; then
+    error "Supported package manager is not detected, please install the following package manually:"
+    echo
+    echo -e "\t* $_package_name"
+    echo
+    exit 65
+  fi
+
+  echo "Installing missing dependence '$_package_name' with '$PACKAGE_MANAGEMENT_INSTALL' ... "
+  if $PACKAGE_MANAGEMENT_INSTALL "$_package_name"; then
+    echo "ok"
+  else
+    error "Cannot install '$_package_name' with detected package manager, please install it manually."
+    exit 65
+  fi
+}
+
+is_user_exists() {
+  local _user="$1"
+
+  id "$_user" > /dev/null 2>&1
+}
+
+rerun_with_sudo() {
+  if ! has_command sudo; then
+    return 13
+  fi
+
+  local _target_script
+
+  if has_prefix "$0" "/dev/fd/"; then
+    local _tmp_script="$(mktemp)"
+    chmod +x "$_tmp_script"
+
+    if has_command curl; then
+      curl -o "$_tmp_script" 'https://get.hy2.sh/'
+    elif has_command wget; then
+      wget -O "$_tmp_script" 'https://get.hy2.sh'
+    else
+      return 127
+    fi
+
+    _target_script="$_tmp_script"
+  else
+    _target_script="$0"
+  fi
+
+  note "Re-running this script with sudo. You can also specify FORCE_NO_ROOT=1 to force this script to run as the current user."
+  exec_sudo "$_target_script" "${SCRIPT_ARGS[@]}"
+}
+
+check_permission() {
+  if [[ "$UID" -eq '0' ]]; then
+    return
+  fi
+
+  note "The user running this script is not root."
+
+  case "$FORCE_NO_ROOT" in
+    '1')
+      warning "FORCE_NO_ROOT=1 detected, we will proceed without root, but you may get insufficient privileges errors."
+      ;;
+    *)
+      if ! rerun_with_sudo; then
+        error "Please run this script with root or specify FORCE_NO_ROOT=1 to force this script to run as the current user."
+        exit 13
+      fi
+      ;;
+  esac
+}
+
+check_environment_operating_system() {
+  if [[ -n "$OPERATING_SYSTEM" ]]; then
+    warning "OPERATING_SYSTEM=$OPERATING_SYSTEM detected, operating system detection will not be performed."
+    return
+  fi
+
+  if [[ "x$(uname)" == "xLinux" ]]; then
+    OPERATING_SYSTEM=linux
+    return
+  fi
+
+  error "This script only supports Linux."
+  note "Specify OPERATING_SYSTEM=[linux|darwin|freebsd|windows] to bypass this check and force this script to run on this $(uname)."
+  exit 95
+}
+
+check_environment_architecture() {
+  if [[ -n "$ARCHITECTURE" ]]; then
+    warning "ARCHITECTURE=$ARCHITECTURE detected, architecture detection will not be performed."
+    return
+  fi
+
+  case "$(uname -m)" in
+    'i386' | 'i686')
+      ARCHITECTURE='386'
+      ;;
+    'amd64' | 'x86_64')
+      ARCHITECTURE='amd64'
+      ;;
+    'armv5tel' | 'armv6l' | 'armv7' | 'armv7l')
+      ARCHITECTURE='arm'
+      ;;
+    'armv8' | 'aarch64')
+      ARCHITECTURE='arm64'
+      ;;
+    'mips' | 'mipsle' | 'mips64' | 'mips64le')
+      ARCHITECTURE='mipsle'
+      ;;
+    's390x')
+      ARCHITECTURE='s390x'
+      ;;
+    *)
+      error "The architecture '$(uname -a)' is not supported."
+      note "Specify ARCHITECTURE=<architecture> to bypass this check and force this script to run on this $(uname -m)."
+      exit 8
+      ;;
+  esac
+}
+
+check_environment_systemd() {
+  if [[ -d "/run/systemd/system" ]] || grep -q systemd <(ls -l /sbin/init); then
+    return
+  fi
+
+  case "$FORCE_NO_SYSTEMD" in
+    '1')
+      warning "FORCE_NO_SYSTEMD=1, we will proceed as normal even if systemd is not detected."
+      ;;
+    '2')
+      warning "FORCE_NO_SYSTEMD=2, we will proceed but skip all systemd related commands."
+      ;;
+    *)
+      error "This script only supports Linux distributions with systemd."
+      note "Specify FORCE_NO_SYSTEMD=1 to disable this check and force this script to run as if systemd exists."
+      note "Specify FORCE_NO_SYSTEMD=2 to disable this check and skip all systemd related commands."
+      ;;
+  esac
+}
+
+check_environment_curl() {
+  if has_command curl; then
+    return
+  fi
+
+  install_software curl
+}
+
+check_environment_grep() {
+  if has_command grep; then
+    return
+  fi
+
+  install_software grep
+}
+
+check_environment() {
+  check_environment_operating_system
+  check_environment_architecture
+  check_environment_systemd
+  check_environment_curl
+  check_environment_grep
+}
+
+vercmp_segment() {
+  local _lhs="$1"
+  local _rhs="$2"
+
+  if [[ "x$_lhs" == "x$_rhs" ]]; then
+    echo 0
+    return
+  fi
+  if [[ -z "$_lhs" ]]; then
+    echo -1
+    return
+  fi
+  if [[ -z "$_rhs" ]]; then
+    echo 1
+    return
+  fi
+
+  local _lhs_num="${_lhs//[A-Za-z]*/}"
+  local _rhs_num="${_rhs//[A-Za-z]*/}"
+
+  if [[ "x$_lhs_num" == "x$_rhs_num" ]]; then
+    echo 0
+    return
+  fi
+  if [[ -z "$_lhs_num" ]]; then
+    echo -1
+    return
+  fi
+  if [[ -z "$_rhs_num" ]]; then
+    echo 1
+    return
+  fi
+  local _numcmp=$(($_lhs_num - $_rhs_num))
+  if [[ "$_numcmp" -ne 0 ]]; then
+    echo "$_numcmp"
+    return
+  fi
+
+  local _lhs_suffix="${_lhs#"$_lhs_num"}"
+  local _rhs_suffix="${_rhs#"$_rhs_num"}"
+
+  if [[ "x$_lhs_suffix" == "x$_rhs_suffix" ]]; then
+    echo 0
+    return
+  fi
+  if [[ -z "$_lhs_suffix" ]]; then
+    echo 1
+    return
+  fi
+  if [[ -z "$_rhs_suffix" ]]; then
+    echo -1
+    return
+  fi
+  if [[ "$_lhs_suffix" < "$_rhs_suffix" ]]; then
+    echo -1
+    return
+  fi
+  echo 1
+}
+
+vercmp() {
+  local _lhs=${1#v}
+  local _rhs=${2#v}
+
+  while [[ -n "$_lhs" && -n "$_rhs" ]]; do
+    local _clhs="${_lhs/.*/}"
+    local _crhs="${_rhs/.*/}"
+
+    local _segcmp="$(vercmp_segment "$_clhs" "$_crhs")"
+    if [[ "$_segcmp" -ne 0 ]]; then
+      echo "$_segcmp"
+      return
+    fi
+
+    _lhs="${_lhs#"$_clhs"}"
+    _lhs="${_lhs#.}"
+    _rhs="${_rhs#"$_crhs"}"
+    _rhs="${_rhs#.}"
+  done
+
+  if [[ "x$_lhs" == "x$_rhs" ]]; then
+    echo 0
+    return
+  fi
+
+  if [[ -z "$_lhs" ]]; then
+    echo -1
+    return
+  fi
+
+  if [[ -z "$_rhs" ]]; then
+    echo 1
+    return
+  fi
+
+  return
+}
+
+check_hysteria_user() {
+  local _default_hysteria_user="$1"
+
+  if [[ -n "$HYSTERIA_USER" ]]; then
+    return
+  fi
+
+  if [[ ! -e "$SYSTEMD_SERVICES_DIR/hysteria-server.service" ]]; then
+    HYSTERIA_USER="$_default_hysteria_user"
+    return
+  fi
+
+  HYSTERIA_USER="$(grep -o '^User=\w*' "$SYSTEMD_SERVICES_DIR/hysteria-server.service" | tail -1 | cut -d '=' -f 2 || true)"
+
+  if [[ -z "$HYSTERIA_USER" ]]; then
+    HYSTERIA_USER="$_default_hysteria_user"
+  fi
+}
+
+check_hysteria_homedir() {
+  local _default_hysteria_homedir="$1"
+
+  if [[ -n "$HYSTERIA_HOME_DIR" ]]; then
+    return
+  fi
+
+  if ! is_user_exists "$HYSTERIA_USER"; then
+    HYSTERIA_HOME_DIR="$_default_hysteria_homedir"
+    return
+  fi
+
+  HYSTERIA_HOME_DIR="$(eval echo ~"$HYSTERIA_USER")"
+}
+
+
+###
+# ARGUMENTS PARSER
+###
+
+show_usage_and_exit() {
+  echo
+  echo -e "\t$(tbold)$SCRIPT_NAME$(treset) - hysteria server install script"
+  echo
+  echo -e "Usage:"
+  echo
+  echo -e "$(tbold)Install hysteria$(treset)"
+  echo -e "\t$0 [ -f | -l <file> | --version <version> ]"
+  echo -e "Flags:"
+  echo -e "\t-f, --force\tForce re-install latest or specified version even if it has been installed."
+  echo -e "\t-l, --local <file>\tInstall specified hysteria binary instead of download it."
+  echo -e "\t--version <version>\tInstall specified version instead of the latest."
+  echo
+  echo -e "$(tbold)Remove hysteria$(treset)"
+  echo -e "\t$0 --remove"
+  echo
+  echo -e "$(tbold)Check for the update$(treset)"
+  echo -e "\t$0 -c"
+  echo -e "\t$0 --check"
+  echo
+  echo -e "$(tbold)Show this help$(treset)"
+  echo -e "\t$0 -h"
+  echo -e "\t$0 --help"
+  exit 0
+}
+
+parse_arguments() {
+  while [[ "$#" -gt '0' ]]; do
+    case "$1" in
+      '--remove')
+        if [[ -n "$OPERATION" && "$OPERATION" != 'remove' ]]; then
+          show_argument_error_and_exit "Option '--remove' is in conflict with other options."
         fi
-    elif [[ $certInput == 3 ]]; then
-        read -p "请输入公钥文件 crt 的路径：" cert_path
-        yellow "公钥文件 crt 的路径：$certpath "
-        read -p "请输入密钥文件 key 的路径：" key_path
-        yellow "密钥文件 key 的路径：$keypath "
-        read -p "请输入证书的域名：" domain
-        yellow "证书域名：$domain"
-
-        hy_domain=$domain
-    else
-        green "将使用自签证书作为 Hysteria 的节点证书"
-
-        read -rp "请输入 Hysteria 自签证书地址 （去除https://） [回车默认必应]：" certsite
-        [[ -z $certsite ]] && certsite="www.bing.com"
-        yellow "使用在 Hysteria 自签证书地址为：$certsite"
-
-        WARPv4Status=$(curl -s4m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
-        WARPv6Status=$(curl -s6m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
-        if [[ $WARPv4Status =~ on|plus ]] || [[ $WARPv6Status =~ on|plus ]]; then
-            wg-quick down wgcf >/dev/null 2>&1
-            systemctl stop warp-go >/dev/null 2>&1
-            realip
-            wg-quick up wgcf >/dev/null 2>&1
-            systemctl start warp-go >/dev/null 2>&1
-        else
-            realip
+        OPERATION='remove'
+        ;;
+      '--version')
+        VERSION="$2"
+        if [[ -z "$VERSION" ]]; then
+          show_argument_error_and_exit "Please specify the version for option '--version'."
         fi
-
-        cert_path="/etc/hysteria/cert.crt"
-        key_path="/etc/hysteria/private.key"
-
-        openssl ecparam -genkey -name prime256v1 -out /etc/hysteria/private.key
-        openssl req -new -x509 -days 36500 -key /etc/hysteria/private.key -out /etc/hysteria/cert.crt -subj "/CN=$certsite"
-
-        chmod 777 /etc/hysteria/cert.crt
-        chmod 777 /etc/hysteria/private.key
-
-        hy_domain="$certsite"
-        domain="$certsite"
-    fi
-}
-
-inst_pro(){
-    green "Hysteria 节点协议如下："
-    echo ""
-    echo -e " ${GREEN}1.${PLAIN} UDP ${YELLOW}（默认）${PLAIN}"
-    echo -e " ${GREEN}2.${PLAIN} wechat-video"
-    echo -e " ${GREEN}3.${PLAIN} faketcp"
-    echo ""
-    read -rp "请输入选项 [1-3]: " proInput
-    if [[ $proInput == 2 ]]; then
-        protocol="wehcat-video"
-    elif [[ $proInput == 3 ]]; then
-        protocol="faketcp"
-    else
-        protocol="udp"
-    fi
-    yellow "将使用 $protocol 作为 Hysteria 的节点协议"
-}
-
-inst_port(){
-    iptables -t nat -F PREROUTING >/dev/null 2>&1
-
-    read -p "设置 Hysteria 端口 [1-65535]（回车则随机分配端口）：" port
-    [[ -z $port ]] && port=$(shuf -i 2000-65535 -n 1)
-    until [[ -z $(ss -tunlp | grep -w udp | awk '{print $5}' | sed 's/.*://g' | grep -w "$port") ]]; do
-        if [[ -n $(ss -tunlp | grep -w udp | awk '{print $5}' | sed 's/.*://g' | grep -w "$port") ]]; then
-            echo -e "${RED} $port ${PLAIN} 端口已经被其他程序占用，请更换端口重试！"
-            read -p "设置 Hysteria 2 端口 [1-65535]（回车则随机分配端口）：" port
-            [[ -z $port ]] && port=$(shuf -i 2000-65535 -n 1)
+        shift
+        if ! has_prefix "$VERSION" 'v'; then
+          show_argument_error_and_exit "Version numbers should begin with 'v' (such as 'v2.0.0'), got '$VERSION'"
         fi
-    done
-
-    yellow "将在 Hysteria 节点使用的端口是：$port"
-}
-
-inst_jump(){
-    green "Hysteria 端口使用模式如下："
-    echo ""
-    echo -e " ${GREEN}1.${PLAIN} 单端口 ${YELLOW}（默认）${PLAIN}"
-    echo -e " ${GREEN}2.${PLAIN} 端口跳跃"
-    echo ""
-    read -rp "请输入选项 [1-2]: " jumpInput
-    if [[ $jumpInput == 2 ]]; then
-        read -p "设置范围端口的起始端口 (建议10000-65535之间)：" firstport
-        read -p "设置一个范围端口的末尾端口 (建议10000-65535之间，一定要比上面起始端口大)：" endport
-        if [[ $firstport -ge $endport ]]; then
-            until [[ $firstport -le $endport ]]; do
-                if [[ $firstport -ge $endport ]]; then
-                    red "你设置的起始端口小于末尾端口，请重新输入起始和末尾端口"
-                    read -p "设置范围端口的起始端口 (建议10000-65535之间)：" firstport
-                    read -p "设置一个范围端口的末尾端口 (建议10000-65535之间，一定要比上面起始端口大)：" endport
-                fi
-            done
+        ;;
+      '-c' | '--check')
+        if [[ -n "$OPERATION" && "$OPERATION" != 'check' ]]; then
+          show_argument_error_and_exit "Option '-c' or '--check' is in conflict with other options."
         fi
-        iptables -t nat -A PREROUTING -p udp --dport $firstport:$endport  -j DNAT --to-destination :$port
-        ip6tables -t nat -A PREROUTING -p udp --dport $firstport:$endport  -j DNAT --to-destination :$port
-        netfilter-persistent save >/dev/null 2>&1
-    else
-        red "将继续使用单端口模式"
-    fi
+        OPERATION='check_update'
+        ;;
+      '-f' | '--force')
+        FORCE='1'
+        ;;
+      '-h' | '--help')
+        show_usage_and_exit
+        ;;
+      '-l' | '--local')
+        LOCAL_FILE="$2"
+        if [[ -z "$LOCAL_FILE" ]]; then
+          show_argument_error_and_exit "Please specify the local binary to install for option '-l' or '--local'."
+        fi
+        break
+        ;;
+      *)
+        show_argument_error_and_exit "Unknown option '$1'"
+        ;;
+    esac
+    shift
+  done
+
+  if [[ -z "$OPERATION" ]]; then
+    OPERATION='install'
+  fi
+
+  # validate arguments
+  case "$OPERATION" in
+    'install')
+      if [[ -n "$VERSION" && -n "$LOCAL_FILE" ]]; then
+        show_argument_error_and_exit '--version and --local cannot be used together.'
+      fi
+      ;;
+    *)
+      if [[ -n "$VERSION" ]]; then
+        show_argument_error_and_exit "--version is only valid for install operation."
+      fi
+      if [[ -n "$LOCAL_FILE" ]]; then
+        show_argument_error_and_exit "--local is only valid for install operation."
+      fi
+      ;;
+  esac
 }
 
-inst_pwd(){
-    read -p "设置 Hysteria 密码（回车跳过为随机字符）：" auth_pwd
-    [[ -z $auth_pwd ]] && auth_pwd=$(date +%s%N | md5sum | cut -c 1-8)
-    yellow "使用在 Hysteria 节点的密码为：$auth_pwd"
-}
 
-inst_resolv(){
-    green "Hysteria 域名解析模式如下："
-    echo ""
-    echo -e " ${GREEN}1.${PLAIN} IPv4 优先 ${YELLOW}（默认）${PLAIN}"
-    echo -e " ${GREEN}2.${PLAIN} IPv6 优先"
-    echo ""
-    read -rp "请输入选项 [1-2]: " resolvInput
-    if [[ $resolvInput == 2 ]]; then
-        yellow "Hysteria 域名解析模式已设置成 IPv6 优先"
-        resolv=64
-    else
-        yellow "Hysteria 域名解析模式已设置成 IPv4 优先"
-        resolv=46
-    fi
-}
+###
+# FILE TEMPLATES
+###
 
-inst_site(){
-    read -rp "请输入 Hysteria 2 的伪装网站地址 （去除https://） [回车世嘉maimai日本网站]：" proxysite
-    [[ -z $proxysite ]] && proxysite="maimai.sega.jp"
-    yellow "使用在 Hysteria 2 节点的伪装网站为：$proxysite"
-}
+# /etc/systemd/system/hysteria-server.service
+tpl_hysteria_server_service_base() {
+  local _config_name="$1"
 
-inst_hyv1(){
-    if [[ -f "/etc/hysteria/config.yaml" ]]; then
-        red "检测到已安装 Hysteria 2，请先卸载再安装 Hysteria 1！"
-        exit 1
-    fi
+  cat << EOF
+[Unit]
+Description=Hysteria Server Service (${_config_name}.yaml)
+After=network.target
 
-    if [[ ! $SYSTEM == "CentOS" ]]; then
-        ${PACKAGE_UPDATE[int]}
-    fi
-    ${PACKAGE_INSTALL[int]} curl wget sudo qrencode procps iptables-persistent netfilter-persistent
+[Service]
+Type=simple
+ExecStart=$EXECUTABLE_INSTALL_PATH server --config ${CONFIG_DIR}/${_config_name}.yaml
+WorkingDirectory=$HYSTERIA_HOME_DIR
+User=$HYSTERIA_USER
+Group=$HYSTERIA_USER
+Environment=HYSTERIA_LOG_LEVEL=info
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW
+NoNewPrivileges=true
 
-    wget -N https://raw.githubusercontent.com/Misaka-blog/hysteria-install/main/hy1/install_server.sh
-    bash install_server.sh
-    rm -f install_server.sh
-
-    if [[ -f "/usr/local/bin/hysteria" ]]; then
-        green "Hysteria 1 已安装成功！"
-    else
-        red "Hysteria 1 安装失败！请重新运行脚本后安装"
-    fi
-
-    # 询问用户 Hysteria 配置
-    inst_cert
-    inst_pro
-    inst_port && [[ $protocol == "udp" ]] && inst_jump
-    inst_pwd
-    inst_resolv
-
-    # 设置 Hysteria 配置文件
-    cat <<EOF > /etc/hysteria/config.json
-{
-    "protocol": "$protocol",
-    "listen": ":$port",
-    "resolve_preference": "$resolv",
-    "cert": "$cert_path",
-    "key": "$key_path",
-    "alpn": "h3",
-    "auth": {
-        "mode": "password",
-        "config": {
-            "password": "$auth_pwd"
-        }
-    }
-}
+[Install]
+WantedBy=multi-user.target
 EOF
-
-    # 确定最终入站端口范围
-    if [[ -n $firstport ]]; then
-        last_port="$port,$firstport-$endport"
-    else
-        last_port=$port
-    fi
-
-    # 给 IPv6 地址加中括号
-    if [[ -n $(echo $ip | grep ":") ]]; then
-        last_ip="[$ip]"
-    else
-        last_ip=$ip
-    fi
-
-    # 判断证书是否为必应自签，如是则使用 IP 作为节点入站
-    if [[ $hy_domain == "$certsite" ]]; then
-        hy_domain=$last_ip
-    fi
-
-    # 设置 V2rayN 及 Clash Meta 配置文件
-    mkdir /root/hy >/dev/null 2>&1
-    cat << EOF > /root/hy/hy-client.json
-{
-    "protocol": "$protocol",
-    "server": "$hy_domain:$last_port",
-    "server_name": "$domain",
-    "alpn": "h3",
-    "up_mbps": 20,
-    "down_mbps": 100,
-    "auth_str": "$auth_pwd",
-    "insecure": true,
-    "retry": 3,
-    "retry_interval": 3,
-    "fast_open": true,
-    "lazy_start": true,
-    "hop_interval": 60,
-    "socks5": {
-        "listen": "127.0.0.1:5080"
-    }
-}
-EOF
-
-    cat << EOF > /root/hy/clash-meta.yaml
-mixed-port: 7890
-external-controller: 127.0.0.1:9090
-allow-lan: false
-mode: rule
-log-level: debug
-ipv6: true
-dns:
-  enable: true
-  listen: 0.0.0.0:53
-  enhanced-mode: fake-ip
-  nameserver:
-    - 8.8.8.8
-    - 1.1.1.1
-    - 114.114.114.114
-proxies:
-  - name: Misaka-Hysteria1
-    type: hysteria
-    server: $hy_domain
-    port: $last_port
-    auth_str: $auth_pwd
-    alpn:
-      - h3
-    protocol: $protocol
-    up: 20
-    down: 100
-    sni: $domain
-    skip-cert-verify: true
-proxy-groups:
-  - name: Proxy
-    type: select
-    proxies:
-      - Misaka-Hysteria1
-      
-rules:
-  - GEOIP,CN,DIRECT
-  - MATCH,Proxy
-EOF
-
-    url="hysteria://$hy_domain:$last_port?protocol=$protocol&auth=$auth_pwd&peer=$domain&insecure=$true&upmbps=20&downmbps=100&alpn=h3#Misaka-Hysteria1"
-    echo $url > /root/hy/url.txt
-
-    systemctl daemon-reload
-    systemctl enable hysteria-server
-    systemctl start hysteria-server
-
-    if [[ -n $(systemctl status hysteria-server 2>/dev/null | grep -w active) && -f '/etc/hysteria/config.json' ]]; then
-        green "Hysteria 服务启动成功"
-    else
-        red "Hysteria-server 服务启动失败，请运行 systemctl status hysteria-server 查看服务状态并反馈，脚本退出" && exit 1
-    fi
-
-    showconf
 }
 
-unst_hyv1(){
-    systemctl stop hysteria-server.service >/dev/null 2>&1
-    systemctl disable hysteria-server.service >/dev/null 2>&1
-    rm -f /lib/systemd/system/hysteria-server.service /lib/systemd/system/hysteria-server@.service
-    rm -rf /usr/local/bin/hysteria /etc/hysteria /root/hy /root/hysteria.sh
-    iptables -t nat -F PREROUTING >/dev/null 2>&1
-    netfilter-persistent save >/dev/null 2>&1
-    green "Hysteria 1 已彻底卸载完成！"
+# /etc/systemd/system/hysteria-server.service
+tpl_hysteria_server_service() {
+  tpl_hysteria_server_service_base 'config'
 }
 
-inst_hyv2(){
-    if [[ -f "/etc/hysteria/config.yaml" ]]; then
-        red "检测到已安装 Hysteria 2，请先卸载再安装 Hysteria 1！"
-        exit 1
-    fi
+# /etc/systemd/system/hysteria-server@.service
+tpl_hysteria_server_x_service() {
+  tpl_hysteria_server_service_base '%i'
+}
 
-    if [[ ! $SYSTEM == "CentOS" ]]; then
-        ${PACKAGE_UPDATE[int]}
-    fi
-    ${PACKAGE_INSTALL[int]} curl wget sudo qrencode procps iptables-persistent netfilter-persistent
+# /etc/hysteria/config.yaml
+tpl_etc_hysteria_config_yaml() {
+  cat << EOF
+# listen: :443
 
-    wget -N https://raw.githubusercontent.com/Misaka-blog/hysteria-install/main/hy2/install_server.sh
-    bash install_server.sh
-    rm -f install_server.sh
-
-    if [[ -f "/usr/local/bin/hysteria" ]]; then
-        green "Hysteria 2 已安装成功！"
-    else
-        red "Hysteria 2 安装失败！请重新运行脚本后安装"
-    fi
-
-    # 询问用户 Hysteria 配置
-    inst_cert
-    inst_port
-    inst_jump
-    inst_pwd
-    inst_site
-
-    # 设置 Hysteria 配置文件
-    cat << EOF > /etc/hysteria/config.yaml
-listen: :$port
-
-tls:
-  cert: $cert_path
-  key: $key_path
-
-quic:
-  initStreamReceiveWindow: 16777216
-  maxStreamReceiveWindow: 16777216
-  initConnReceiveWindow: 33554432
-  maxConnReceiveWindow: 33554432
+acme:
+  domains:
+    - your.domain.net
+  email: your@email.com
 
 auth:
   type: password
-  password: $auth_pwd
+  password: $(generate_random_password)
 
 masquerade:
   type: proxy
   proxy:
-    url: https://$proxysite
+    url: https://news.ycombinator.com/
     rewriteHost: true
 EOF
+}
 
-    # 确定最终入站端口范围
-    if [[ -n $firstport ]]; then
-        last_port="$port,$firstport-$endport"
+
+###
+# SYSTEMD
+###
+
+get_running_services() {
+  if [[ "x$FORCE_NO_SYSTEMD" == "x2" ]]; then
+    return
+  fi
+
+  systemctl list-units --state=active --plain --no-legend \
+    | grep -o "hysteria-server@*[^\s]*.service" || true
+}
+
+restart_running_services() {
+  if [[ "x$FORCE_NO_SYSTEMD" == "x2" ]]; then
+    return
+  fi
+
+  echo "Restarting running service ... "
+
+  for service in $(get_running_services); do
+    echo -ne "Restarting $service ... "
+    systemctl restart "$service"
+    echo "done"
+  done
+}
+
+stop_running_services() {
+  if [[ "x$FORCE_NO_SYSTEMD" == "x2" ]]; then
+    return
+  fi
+
+  echo "Stopping running service ... "
+
+  for service in $(get_running_services); do
+    echo -ne "Stopping $service ... "
+    systemctl stop "$service"
+    echo "done"
+  done
+}
+
+
+###
+# HYSTERIA & GITHUB API
+###
+
+is_hysteria_installed() {
+  # RETURN VALUE
+  # 0: hysteria is installed
+  # 1: hysteria is not installed
+
+  if [[ -f "$EXECUTABLE_INSTALL_PATH" || -h "$EXECUTABLE_INSTALL_PATH" ]]; then
+    return 0
+  fi
+  return 1
+}
+
+is_hysteria1_version() {
+  local _version="$1"
+
+  has_prefix "$_version" "v1." || has_prefix "$_version" "v0."
+}
+
+get_installed_version() {
+  if is_hysteria_installed; then
+    if "$EXECUTABLE_INSTALL_PATH" version > /dev/null 2>&1; then
+      "$EXECUTABLE_INSTALL_PATH" version | grep Version | grep -o 'v[.0-9]*'
+    elif "$EXECUTABLE_INSTALL_PATH" -v > /dev/null 2>&1; then
+      # hysteria 1
+      "$EXECUTABLE_INSTALL_PATH" -v | cut -d ' ' -f 3
+    fi
+  fi
+}
+
+get_latest_version() {
+  if [[ -n "$VERSION" ]]; then
+    echo "$VERSION"
+    return
+  fi
+
+  local _tmpfile=$(mktemp)
+  if ! curl -sS -H 'Accept: application/vnd.github.v3+json' "$API_BASE_URL/releases/latest" -o "$_tmpfile"; then
+    error "Failed to get the latest version from GitHub API, please check your network and try again."
+    exit 11
+  fi
+
+  local _latest_version=$(grep 'tag_name' "$_tmpfile" | head -1 | grep -o '"app/v.*"')
+  _latest_version=${_latest_version#'"app/'}
+  _latest_version=${_latest_version%'"'}
+
+  if [[ -n "$_latest_version" ]]; then
+    echo "$_latest_version"
+  fi
+
+  rm -f "$_tmpfile"
+}
+
+download_hysteria() {
+  local _version="$1"
+  local _destination="$2"
+
+  local _download_url="$REPO_URL/releases/download/app/$_version/hysteria-$OPERATING_SYSTEM-$ARCHITECTURE"
+  echo "Downloading hysteria binary: $_download_url ..."
+  if ! curl -R -H 'Cache-Control: no-cache' "$_download_url" -o "$_destination"; then
+    error "Download failed, please check your network and try again."
+    return 11
+  fi
+  return 0
+}
+
+check_update() {
+  # RETURN VALUE
+  # 0: update available
+  # 1: installed version is latest
+
+  echo -ne "Checking for installed version ... "
+  local _installed_version="$(get_installed_version)"
+  if [[ -n "$_installed_version" ]]; then
+    echo "$_installed_version"
+  else
+    echo "not installed"
+  fi
+
+  echo -ne "Checking for latest version ... "
+  local _latest_version="$(get_latest_version)"
+  if [[ -n "$_latest_version" ]]; then
+    echo "$_latest_version"
+    VERSION="$_latest_version"
+  else
+    echo "failed"
+    return 1
+  fi
+
+  local _vercmp="$(vercmp "$_installed_version" "$_latest_version")"
+  if [[ "$_vercmp" -lt 0 ]]; then
+    return 0
+  fi
+
+  return 1
+}
+
+
+###
+# ENTRY
+###
+
+perform_install_hysteria_binary() {
+  if [[ -n "$LOCAL_FILE" ]]; then
+    note "Performing local install: $LOCAL_FILE"
+
+    echo -ne "Installing hysteria executable ... "
+
+    if install -Dm755 "$LOCAL_FILE" "$EXECUTABLE_INSTALL_PATH"; then
+      echo "ok"
     else
-        last_port=$port
+      exit 2
     fi
 
-    # 给 IPv6 地址加中括号
-    if [[ -n $(echo $ip | grep ":") ]]; then
-        last_ip="[$ip]"
-    else
-        last_ip=$ip
+    return
+  fi
+
+  local _tmpfile=$(mktemp)
+
+  if ! download_hysteria "$VERSION" "$_tmpfile"; then
+    rm -f "$_tmpfile"
+    exit 11
+  fi
+
+  echo -ne "Installing hysteria executable ... "
+
+  if install -Dm755 "$_tmpfile" "$EXECUTABLE_INSTALL_PATH"; then
+    echo "ok"
+  else
+    exit 13
+  fi
+
+  rm -f "$_tmpfile"
+}
+
+perform_remove_hysteria_binary() {
+  remove_file "$EXECUTABLE_INSTALL_PATH"
+}
+
+perform_install_hysteria_example_config() {
+  install_content -Dm644 "$(tpl_etc_hysteria_config_yaml)" "$CONFIG_DIR/config.yaml" ""
+}
+
+perform_install_hysteria_systemd() {
+  if [[ "x$FORCE_NO_SYSTEMD" == "x2" ]]; then
+    return
+  fi
+
+  install_content -Dm644 "$(tpl_hysteria_server_service)" "$SYSTEMD_SERVICES_DIR/hysteria-server.service" "1"
+  install_content -Dm644 "$(tpl_hysteria_server_x_service)" "$SYSTEMD_SERVICES_DIR/hysteria-server@.service" "1"
+
+  systemctl daemon-reload
+}
+
+perform_remove_hysteria_systemd() {
+  remove_file "$SYSTEMD_SERVICES_DIR/hysteria-server.service"
+  remove_file "$SYSTEMD_SERVICES_DIR/hysteria-server@.service"
+
+  systemctl daemon-reload
+}
+
+perform_install_hysteria_home_legacy() {
+  if ! is_user_exists "$HYSTERIA_USER"; then
+    echo -ne "Creating user $HYSTERIA_USER ... "
+    useradd -r -d "$HYSTERIA_HOME_DIR" -m "$HYSTERIA_USER"
+    echo "ok"
+  fi
+}
+
+perform_install() {
+  local _is_frash_install
+  local _is_upgrade_from_hysteria1
+  if ! is_hysteria_installed; then
+    _is_frash_install=1
+  elif is_hysteria1_version "$(get_installed_version)"; then
+    _is_upgrade_from_hysteria1=1
+  fi
+
+  local _is_update_required
+
+  if [[ -n "$LOCAL_FILE" ]] || [[ -n "$VERSION" ]] || check_update; then
+    _is_update_required=1
+  fi
+
+  if [[ "x$FORCE" == "x1" ]]; then
+    if [[ -z "$_is_update_required" ]]; then
+      note "Option '--force' detected, re-install even if installed version is the latest."
     fi
+    _is_update_required=1
+  fi
 
-    mkdir /root/hy
-    cat << EOF > /root/hy/hy-client.yaml
-server: $last_ip:$last_port
+  if [[ -z "$_is_update_required" ]]; then
+    echo "$(tgreen)Installed version is up-to-date, there is nothing to do.$(treset)"
+    return
+  fi
 
-auth: $auth_pwd
+  if is_hysteria1_version "$VERSION"; then
+    error "This script can only install Hysteria 2."
+    exit 95
+  fi
 
-tls:
-  sni: $hy_domain
-  insecure: true
+  perform_install_hysteria_binary
+  perform_install_hysteria_example_config
+  perform_install_hysteria_home_legacy
+  perform_install_hysteria_systemd
 
-quic:
-  initStreamReceiveWindow: 16777216
-  maxStreamReceiveWindow: 16777216
-  initConnReceiveWindow: 33554432
-  maxConnReceiveWindow: 33554432
+  if [[ -n "$_is_frash_install" ]]; then
+    echo
+    echo -e "$(tbold)Congratulation! Hysteria 2 has been successfully installed on your server.$(treset)"
+    echo
+    echo -e "What's next?"
+    echo
+    echo -e "\t+ Take a look at the differences between Hysteria 2 and Hysteria 1 at https://hysteria.network/docs/misc/2-vs-1/"
+    echo -e "\t+ Check out the quick server config guide at $(tblue)https://hysteria.network/docs/getting-started/Server/$(treset)"
+    echo -e "\t+ Edit server config file at $(tred)$CONFIG_DIR/config.yaml$(treset)"
+    echo -e "\t+ Start your hysteria server with $(tred)systemctl start hysteria-server.service$(treset)"
+    echo -e "\t+ Configure hysteria start on system boot with $(tred)systemctl enable hysteria-server.service$(treset)"
+    echo
+  elif [[ -n "$_is_upgrade_from_hysteria1" ]]; then
+    echo -e "Skip automatic service restart due to $(tred)incompatible$(treset) upgrade."
+    echo
+    echo -e "$(tbold)Hysteria has been successfully update to $VERSION from Hysteria 1.$(treset)"
+    echo
+    echo -e "$(tred)Hysteria 2 uses a completely redesigned protocol & config, which is NOT compatible with the version 1.x.x in any way.$(treset)"
+    echo
+    echo -e "\t+ Take a look at the behavior changes in Hysteria 2 at $(tblue)https://hysteria.network/docs/misc/2-vs-1/$(treset)"
+    echo -e "\t+ Check out the quick server configuration guide for Hysteria 2 at $(tblue)https://hysteria.network/docs/getting-started/Server/$(treset)"
+    echo -e "\t+ Migrate server config file to the Hysteria 2 at $(tred)$CONFIG_DIR/config.yaml$(treset)"
+    echo -e "\t+ Start your hysteria server with $(tred)systemctl restart hysteria-server.service$(treset)"
+    echo -e "\t+ Configure hysteria start on system boot with $(tred)systemctl enable hysteria-server.service$(treset)"
+  else
+    restart_running_services
 
-fastOpen: true
-
-socks5:
-  listen: 127.0.0.1:5080
-
-transport:
-  udp:
-    hopInterval: 30s 
-EOF
-    cat << EOF > /root/hy/hy-client.json
-{
-  "server": "$last_ip:$last_port",
-  "auth": "$auth_pwd",
-  "tls": {
-    "sni": "$hy_domain",
-    "insecure": true
-  },
-  "quic": {
-    "initStreamReceiveWindow": 16777216,
-    "maxStreamReceiveWindow": 16777216,
-    "initConnReceiveWindow": 33554432,
-    "maxConnReceiveWindow": 33554432
-  },
-  "socks5": {
-    "listen": "127.0.0.1:5080"
-  },
-  "transport": {
-    "udp": {
-      "hopInterval": "30s"
-    }
-  }
-}
-EOF
-
-    url="hysteria2://$auth_pwd@$last_ip:$last_port/?insecure=1&sni=$hy_domain#Misaka-Hysteria2"
-    echo $url > /root/hy/url.txt
-
-    systemctl daemon-reload
-    systemctl enable hysteria-server
-    systemctl start hysteria-server
-    if [[ -n $(systemctl status hysteria-server 2>/dev/null | grep -w active) && -f '/etc/hysteria/config.yaml' ]]; then
-        green "Hysteria 2 服务启动成功"
-    else
-        red "Hysteria 2 服务启动失败，请运行 systemctl status hysteria-server 查看服务状态并反馈，脚本退出" && exit 1
-    fi
-
-    showconf
+    echo
+    echo -e "$(tbold)Hysteria has been successfully update to $VERSION.$(treset)"
+    echo
+    echo -e "Check out the latest changelog $(tblue)https://github.com/apernet/hysteria/blob/master/CHANGELOG.md$(treset)"
+    echo
+  fi
 }
 
-unst_hyv2(){
-    systemctl stop hysteria-server.service >/dev/null 2>&1
-    systemctl disable hysteria-server.service >/dev/null 2>&1
-    rm -f /lib/systemd/system/hysteria-server.service /lib/systemd/system/hysteria-server@.service
-    rm -rf /usr/local/bin/hysteria /etc/hysteria /root/hy /root/hysteria.sh
-    iptables -t nat -F PREROUTING >/dev/null 2>&1
-    netfilter-persistent save >/dev/null 2>&1
-    green "Hysteria 2 已彻底卸载完成！"
+perform_remove() {
+  perform_remove_hysteria_binary
+  stop_running_services
+  perform_remove_hysteria_systemd
+
+  echo
+  echo -e "$(tbold)Congratulation! Hysteria has been successfully removed from your server.$(treset)"
+  echo
+  echo -e "You still need to remove configuration files and ACME certificates manually with the following commands:"
+  echo
+  echo -e "\t$(tred)rm -rf "$CONFIG_DIR"$(treset)"
+  if [[ "x$HYSTERIA_USER" != "xroot" ]]; then
+    echo -e "\t$(tred)userdel -r "$HYSTERIA_USER"$(treset)"
+  fi
+  if [[ "x$FORCE_NO_SYSTEMD" != "x2" ]]; then
+    echo
+    echo -e "You still might need to disable all related systemd services with the following commands:"
+    echo
+    echo -e "\t$(tred)rm -f /etc/systemd/system/multi-user.target.wants/hysteria-server.service$(treset)"
+    echo -e "\t$(tred)rm -f /etc/systemd/system/multi-user.target.wants/hysteria-server@*.service$(treset)"
+    echo -e "\t$(tred)systemctl daemon-reload$(treset)"
+  fi
+  echo
 }
 
-starthysteria(){
-    systemctl start hysteria-server
-    systemctl enable hysteria-server >/dev/null 2>&1
+perform_check_update() {
+  if check_update; then
+    echo
+    echo -e "$(tbold)Update available: $VERSION$(treset)"
+    echo
+    echo -e "$(tgreen)You can download and install the latest version by execute this script without any arguments.$(treset)"
+    echo
+  else
+    echo
+    echo "$(tgreen)Installed version is up-to-date.$(treset)"
+    echo
+  fi
 }
 
-stophysteria(){
-    systemctl stop hysteria-server
-    systemctl disable hysteria-server >/dev/null 2>&1
+main() {
+  parse_arguments "$@"
+
+  check_permission
+  check_environment
+  check_hysteria_user "hysteria"
+  check_hysteria_homedir "/var/lib/$HYSTERIA_USER"
+
+  case "$OPERATION" in
+    "install")
+      perform_install
+      ;;
+    "remove")
+      perform_remove
+      ;;
+    "check_update")
+      perform_check_update
+      ;;
+    *)
+      error "Unknown operation '$OPERATION'."
+      ;;
+  esac
 }
 
-hy_switch(){
-    yellow "请选择你需要的操作："
-    echo ""
-    echo -e " ${GREEN}1.${PLAIN} 启动 Hysteria 2"
-    echo -e " ${GREEN}2.${PLAIN} 关闭 Hysteria 2"
-    echo -e " ${GREEN}3.${PLAIN} 重启 Hysteria 2"
-    echo ""
-    read -rp "请输入选项 [0-3]: " switchInput
-    case $switchInput in
-        1 ) starthysteria ;;
-        2 ) stophysteria ;;
-        3 ) stophysteria && starthysteria ;;
-        * ) exit 1 ;;
-    esac
-}
+main "$@"
 
-changeport(){
-    if [[ -f "/etc/hysteria/config.yaml" ]]; then
-        oldport=$(cat /etc/hysteria/config.yaml 2>/dev/null | sed -n 1p | awk '{print $2}' | awk -F ":" '{print $2}')
-    
-        inst_port && inst_jump
-
-        if [[ -n $firstport ]]; then
-            last_port="$port,$firstport-$endport"
-        else
-            last_port=$port
-        fi
-
-        sed -i "1s#$oldport#$port#g" /etc/hysteria/config.yaml
-        sed -i "1s#$oldport#$last_port#g" /root/hy/hy-client.yaml
-        sed -i "2s#$oldport#$last_port#g" /root/hy/hy-client.json
-        sed -i "1s#$oldport#$last_port#g" /root/hy/url.txt
-
-        stophysteria && starthysteria
-
-        green "Hysteria 2 端口已成功修改为：$port"
-        yellow "请手动更新客户端配置文件以使用节点"
-        showconf
-    else
-        old_port=$(cat /root/hy/hy-client.json | grep -w server | awk '{print $2}' | awk -F '"' '{ print $2}' | awk -F ':' '{ print $NF}')
-        old_procotol=$(cat /etc/hysteria/config.json | grep protocol | awk -F " " '{print $2}' | sed "s/\"//g" | sed "s/,//g" | sed "s/://g")
-
-        inst_port
-
-        # 判断协议是否为 udp，如为 udp 则询问用户重新设置端口跳跃
-        if [[ $old_procotol == "udp" ]]; then
-            inst_jump
-        fi
-
-        if [[ -n $firstport ]]; then
-            last_port="$port,$firstport-$endport"
-        else
-            last_port=$port
-        fi
-
-        sed -i "s/$old_port/$port/g" /etc/hysteria/config.json
-        sed -i "s/$old_port/$last_port/g" /root/hy/hy-client.json
-        sed -i "s/$old_port/$last_port/g" /root/hy/clash-meta.yaml
-        sed -i "s/$old_port/$last_port/g" /root/hy/url.txt
-
-        stophysteria && starthysteria
-
-        green "Hysteria 1 端口已成功修改为：$port"
-        yellow "请手动更新客户端配置文件以使用节点"
-        showconf
-    fi
-}
-
-changepasswd(){
-    if [[ -f "/etc/hysteria/config.yaml" ]]; then
-        old_pwd=$(cat /etc/hysteria/config.yaml 2>/dev/null | sed -n 15p | awk '{print $2}')
-
-        inst_pwd
-
-        sed -i "1s#$old_pwd#$auth_pwd#g" /etc/hysteria/config.yaml
-        sed -i "1s#$old_pwd#$auth_pwd#g" /root/hy/hy-client.yaml
-        sed -i "3s#$old_pwd#$auth_pwd#g" /root/hy/hy-client.json
-        sed -i "s/$old_pwd/$auth_pwd/g" /root/hy/url.txt
-
-        stophysteria && starthysteria
-
-        green "Hysteria 2 节点密码已成功修改为：$auth_pwd"
-        yellow "请手动更新客户端配置文件以使用节点"
-        showconf
-    else
-        old_pwd=$(cat /etc/hysteria/config.json | grep password | sed -n 2p | awk -F " " '{print $2}' | sed "s/\"//g" | sed "s/,//g")
-
-        inst_pwd
-
-        sed -i "s/$old_pwd/$auth_pwd/g" /etc/hysteria/config.json
-        sed -i "s/$old_pwd/$auth_pwd/g" /root/hy/hy-client.json
-        sed -i "s/$old_pwd/$auth_pwd/g" /root/hy/clash-meta.yaml
-        sed -i "s/$old_pwd/$auth_pwd/g" /root/hy/url.txt
-
-        stophysteria && starthysteria
-
-        green "Hysteria 1 节点密码已成功修改为：$auth_pwd"
-        yellow "请手动更新客户端配置文件以使用节点"
-        showconf
-    fi
-}
-
-change_cert(){
-    if [[ -f "/etc/hysteria/config.yaml" ]]; then
-        old_cert=$(cat /etc/hysteria/config.yaml | grep cert | awk -F " " '{print $2}')
-        old_key=$(cat /etc/hysteria/config.yaml | grep key | awk -F " " '{print $2}')
-        old_hydomain=$(cat /root/hy/hy-client.yaml | grep sni | awk '{print $2}')
-
-        inst_cert
-
-        sed -i "s!$old_cert!$cert_path!g" /etc/hysteria/config.yaml
-        sed -i "s!$old_key!$key_path!g" /etc/hysteria/config.yaml
-        sed -i "6s/$old_hydomain/$hy_domain/g" /root/hy/hy-client.yaml
-        sed -i "5s/$old_hydomain/$hy_domain/g" /root/hy/hy-client.json
-        sed -i "s/$old_hydomain/$hy_domain/g" /root/hy/url.txt
-
-        stophysteria && starthysteria
-
-        green "Hysteria 2 节点证书类型已成功修改"
-        yellow "请手动更新客户端配置文件以使用节点"
-        showconf
-    else
-        old_cert=$(cat /etc/hysteria/config.json | grep cert | awk -F " " '{print $2}' | sed "s/\"//g" | sed "s/,//g")
-        old_key=$(cat /etc/hysteria/config.json | grep key | awk -F " " '{print $2}' | sed "s/\"//g" | sed "s/,//g")
-        old_server=$(cat /root/hy/hy-client.json | grep -w server | awk '{print $2}' | awk -F '"' '{ print $2}' | cut -d ':' -f 1)
-        old_domain=$(cat /root/hy/hy-client.json | grep server_name | awk -F " " '{print $2}' | sed "s/\"//g" | sed "s/,//g")
-
-        inst_cert
-
-        if [[ $hy_domain == "$certsite" ]]; then
-            WARPv4Status=$(curl -s4m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
-            WARPv6Status=$(curl -s6m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
-            if [[ $WARPv4Status =~ on|plus ]] || [[ $WARPv6Status =~ on|plus ]]; then
-                wg-quick down wgcf >/dev/null 2>&1
-                systemctl stop warp-go >/dev/null 2>&1
-                hy_domain=$(curl -s4m8 ip.sb -k) || hy_domain="[$(curl -s6m8 ip.sb -k)]"
-                wg-quick up wgcf >/dev/null 2>&1
-                systemctl start warp-go >/dev/null 2>&1
-            else
-                hy_domain=$(curl -s4m8 ip.sb -k) || hy_domain="[$(curl -s6m8 ip.sb -k)]"
-            fi
-        fi
-
-        sed -i "s!$old_cert!$cert_path!g" /etc/hysteria/config.json
-        sed -i "s!$old_key!$key_path!g" /etc/hysteria/config.json
-        sed -i "3s/$old_server/$hy_domain/g" /root/hy/hy-client.json
-        sed -i "4s/$old_domain/$domain/g" /root/hy/hy-client.json
-        sed -i "18s/$old_server/$hy_domain/g" /root/hy/clash-meta.yaml
-        sed -i "26s/$old_domain/$domain/g" /root/hy/clash-meta.yaml
-        sed -i "s/$old_server/$hy_domain/g" /root/hy/url.txt
-        sed -i "s/$old_domain/$domain/g" /root/hy/url.txt
-        
-        stophysteria && starthysteria
-        green "Hysteria 1 节点证书类型已成功修改"
-        yellow "请手动更新客户端配置文件以使用节点"
-        showconf
-    fi
-}
-
-change_pro(){
-    old_pro=$(cat /etc/hysteria/config.json | grep protocol | awk -F " " '{print $2}' | sed "s/\"//g" | sed "s/,//g")
-
-    inst_pro
-
-    sed -i "s/$old_pro/$protocol/g" /etc/hysteria/config.json
-    sed -i "s/$old_pro/$protocol/g" /root/hy/hy-client.json
-    sed -i "s/$old_pro/$protocol/g" /root/hy/clash-meta.yaml
-    sed -i "s/$old_pro/$protocol/g" /root/hy/url.txt
-
-    stophysteria && starthysteria
-
-    green "Hysteria 1 节点协议已成功修改为：$protocol"
-    yellow "请手动更新客户端配置文件以使用节点"
-    showconf
-}
-
-change_resolv(){
-    old_resolv=$(cat /etc/hysteria/config.json | grep resolv | awk -F " " '{print $2}' | sed "s/\"//g" | sed "s/,//g")
-
-    inst_resolv
-
-    sed -i "s/$old_resolv/$resolv/g" /etc/hysteria/config.json
-
-    stophysteria && starthysteria
-
-    green "Hysteria 1 域名解析优先级已成功修改"
-}
-
-changeproxysite(){
-    oldproxysite=$(cat /etc/hysteria/config.yaml | grep url | awk -F " " '{print $2}' | awk -F "https://" '{print $2}')
-    
-    inst_site
-
-    sed -i "s#$oldproxysite#$proxysite#g" /etc/hysteria/config.yaml
-
-    stophysteria && starthysteria
-
-    green "Hysteria 2 节点伪装网站已成功修改为：$proxysite"
-}
-
-changeconf(){
-    if [[ -f "/etc/hysteria/config.yaml" ]]; then
-        green "Hysteria 2 配置变更选择如下:"
-        echo -e " ${GREEN}1.${PLAIN} 修改端口"
-        echo -e " ${GREEN}2.${PLAIN} 修改密码"
-        echo -e " ${GREEN}3.${PLAIN} 修改证书类型"
-        echo -e " ${GREEN}4.${PLAIN} 修改伪装网站"
-        echo ""
-        read -p " 请选择操作 [1-4]：" confAnswer
-        case $confAnswer in
-            1 ) changeport ;;
-            2 ) changepasswd ;;
-            3 ) change_cert ;;
-            4 ) changeproxysite ;;
-            * ) exit 1 ;;
-        esac
-    else
-        green "Hysteria 配置变更选择如下:"
-        echo -e " ${GREEN}1.${PLAIN} 修改端口"
-        echo -e " ${GREEN}2.${PLAIN} 修改密码"
-        echo -e " ${GREEN}3.${PLAIN} 修改证书类型"
-        echo -e " ${GREEN}4.${PLAIN} 修改传输协议"
-        echo -e " ${GREEN}5.${PLAIN} 修改域名解析优先级"
-        echo ""
-        read -p " 请选择操作 [1-5]：" confAnswer
-        case $confAnswer in
-            1 ) changeport ;;
-            2 ) changepasswd ;;
-            3 ) change_cert ;;
-            4 ) change_pro ;;
-            5 ) change_resolv ;;
-            * ) exit 1 ;;
-        esac
-    fi
-}
-
-showconf(){
-    if [[ -f "/etc/hysteria/config.yaml" ]]; then
-        yellow "Hysteria 2 客户端 YAML 配置文件 hy-client.yaml 内容如下，并保存到 /root/hy/hy-client.yaml"
-        red "$(cat /root/hy/hy-client.yaml)"
-        yellow "Hysteria 2 客户端 JSON 配置文件 hy-client.json 内容如下，并保存到 /root/hy/hy-client.json"
-        red "$(cat /root/hy/hy-client.json)"
-        yellow "Hysteria 2 节点分享链接如下，并保存到 /root/hy/url.txt"
-        red "$(cat /root/hy/url.txt)"
-    else
-        yellow "客户端配置文件 hy-client.json 内容如下，并保存到 /root/hy/hy-client.json"
-        cat /root/hy/hy-client.json
-        yellow "Clash Meta 客户端配置文件已保存到 /root/hy/clash-meta.yaml"
-        yellow "Hysteria 节点分享链接如下，并保存到 /root/hy/url.txt"
-        red $(cat /root/hy/url.txt)
-    fi
-}
-
-menu() {
-    clear
-    echo "#############################################################"
-    echo -e "#                  ${RED}Hysteria 2 一键安装脚本${PLAIN}                #"
-    echo -e "# ${GREEN}作者${PLAIN}: AMCTEAMS AMC跨境社区                            #"
-    echo -e "# ${GREEN}博客${PLAIN}: https://www.tkstart.com                        #"
-    echo -e "# ${GREEN}GitHub 项目${PLAIN}: https://github.com/amcteams             #"
-    echo -e "# ${GREEN}GitLab 项目${PLAIN}: https://gitlab.com/amcteams             #"
-    echo -e "# ${GREEN}Telegram 频道${PLAIN}: https://t.me/amcteams                 #"
-    echo -e "# ${GREEN}Telegram 群组${PLAIN}: https://t.me/+OpogS1V6Q8dlOWVh        #"
-    echo -e "# ${GREEN}YouTube 频道${PLAIN}: https://www.youtube.com/@amcteams      #"
-    echo "#############################################################"
-    echo ""
-    echo -e " ${GREEN}1.${PLAIN} 安装 Hysteria 1"
-    echo -e " ${GREEN}2.${PLAIN} ${RED}卸载 Hysteria 1${PLAIN}"
-    echo " -------------"
-    echo -e " ${GREEN}3.${PLAIN} 安装 Hysteria 2"
-    echo -e " ${GREEN}4.${PLAIN} ${RED}卸载 Hysteria 2${PLAIN}"
-    echo " -------------"
-    echo -e " ${GREEN}5.${PLAIN} 关闭、开启、重启 Hysteria"
-    echo -e " ${GREEN}6.${PLAIN} 修改 Hysteria 配置"
-    echo -e " ${GREEN}7.${PLAIN} 显示 Hysteria 配置文件"
-    echo " -------------"
-    echo -e " ${GREEN}0.${PLAIN} 退出脚本"
-    echo ""
-    read -rp "请输入选项 [0-7]: " menuInput
-    case $menuInput in
-        1 ) inst_hyv1 ;;
-        2 ) unst_hyv1 ;;
-        3 ) inst_hyv2 ;;
-        4 ) unst_hyv2 ;;
-        5 ) hy_switch ;;
-        6 ) changeconf ;;
-        7 ) showconf ;;
-        * ) exit 1 ;;
-    esac
-}
-
-menu
+# vim:set ft=bash ts=2 sw=2 sts=2 et:
