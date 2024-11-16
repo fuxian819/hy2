@@ -522,15 +522,16 @@ menu() {
     echo ""
     echo -e " ${GREEN}1.${PLAIN} 安装 Hysteria 2"
     echo -e " ${GREEN}2.${PLAIN} ${RED}卸载 Hysteria 2${PLAIN}"
-    echo " -------------"
+    echo " -------------------------------------------------------------"
     echo -e " ${GREEN}3.${PLAIN} 关闭、开启、重启 Hysteria 2"
     echo -e " ${GREEN}4.${PLAIN} 修改 Hysteria 2 配置"
     echo -e " ${GREEN}5.${PLAIN} 显示 Hysteria 2 配置文件"
-    echo -e " ${GREEN}6.${PLAIN} 更新 Hysieria 2 内核方式1（官方）"
-    echo -e " ${GREEN}7.${PLAIN} 更新 Hysieria 2 内核方式2（脚本）"
-    echo -e " ${GREEN}8.${PLAIN} 查询 Hysieria 2 运行状态"
+    echo -e " ${GREEN}6.${PLAIN} 查询 Hysieria 2 运行状态"
+    echo " -------------------------------------------------------------"        
+    echo -e " ${GREEN}7.${PLAIN} 更新 Hysieria 2 内核方式1（官方）"
+    echo -e " ${GREEN}8.${PLAIN} 更新 Hysieria 2 内核方式2（脚本）"
     echo -e " ${GREEN}9.${PLAIN} 修改系统时区为 Asia/Shanghai"
-    echo " -------------"
+    echo " --------------------------------------------------------------"
     echo -e " ${GREEN}0.${PLAIN} 退出脚本"
     echo ""
     read -rp "请输入选项 [0-5]: " menuInput
@@ -539,10 +540,10 @@ menu() {
         2 ) unsthysteria ;;
         3 ) hysteriaswitch ;;
         4 ) changeconf ;;
-        5 ) showconf ;;
-        6 ) update_core1 ;;
-        7 ) update_core2 ;;
-        8 ) showstatus ;;
+        5 ) showstatus ;;
+        6 ) showconf ;;
+        7 ) update_core1 ;;
+        8 ) update_core2 ;;
         9 ) changeTZ ;;     
         * ) exit 1 ;;
     esac
