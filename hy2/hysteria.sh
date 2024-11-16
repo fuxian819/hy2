@@ -481,16 +481,18 @@ showconf(){
     qrencode -o - -t ANSIUTF8 "$(cat /root/hy/ur2.txt)"
 }
 
-update_hysteria(){
+update_core1(){
         systemctl stop hysteria
         rm -f /usr/local/bin/hysteria
-       bash <(curl -fsSL https://get.hy2.sh/)
-        green "Hysteria 内核已更新到最新版本！"        
-        systemctl start hysteria
-        green "Hysteria 内核已重新启动！"
+        bash <(curl -fsSL https://get.hy2.sh/)
+        green "Hysteria 内核已更新到最新版本！" 
+        systemctl enable --now hysteria-server.service
+        green "Hysteria 内核设置开机自启， 并立即启动服务"   
+        systemctl restart hysteria-server.service
+        green "Hysteria 内核已重新启动！"  
 }
 
-update_core(){
+update_core2(){
     systemctl stop hysteria
     rm -f /usr/local/bin/hysteria
     wget -N https://raw.githubusercontent.com/byilrq/hy2-install/main/hy2/install_server.sh
@@ -499,6 +501,10 @@ update_core(){
     green "Hysteria 内核已更新到最新版本！"
     systemctl start hysteria
     green "Hysteria 内核已经重新启动"
+}
+
+showtime(){
+    systemctl status hysteria-server.service
 }
 
 menu() {
@@ -513,8 +519,9 @@ menu() {
     echo -e " ${GREEN}3.${PLAIN} 关闭、开启、重启 Hysteria 2"
     echo -e " ${GREEN}4.${PLAIN} 修改 Hysteria 2 配置"
     echo -e " ${GREEN}5.${PLAIN} 显示 Hysteria 2 配置文件"
-    echo -e " ${GREEN}6.${PLAIN} 更新 Hysieria2 内核方式1（？）"
-    echo -e " ${GREEN}7.${PLAIN} 更新 Hysieria2 内核方式2（ok）"
+    echo -e " ${GREEN}6.${PLAIN} 更新 Hysieria2 内核方式1（官方）"
+    echo -e " ${GREEN}7.${PLAIN} 更新 Hysieria2 内核方式2（脚本）"
+    echo -e " ${GREEN}8.${PLAIN} 查询 Hysieria2 运行状态"
     echo " -------------"
     echo -e " ${GREEN}0.${PLAIN} 退出脚本"
     echo ""
@@ -525,8 +532,9 @@ menu() {
         3 ) hysteriaswitch ;;
         4 ) changeconf ;;
         5 ) showconf ;;
-        6 ) update_hysteria ;;
-        7 ) update_core ;;
+        6 ) update_core1 ;;
+        7 ) update_core2 ;;
+        8 ) showtime ;;
         * ) exit 1 ;;
     esac
 }
