@@ -482,7 +482,7 @@ showconf(){
 }
 
 update_core1(){
-        systemctl stop hysteria
+        systemctl stop hysteria-server.service
         rm -f /usr/local/bin/hysteria
         bash <(curl -fsSL https://get.hy2.sh/)
         green "Hysteria 内核已更新到最新版本！" 
@@ -519,9 +519,9 @@ menu() {
     echo -e " ${GREEN}3.${PLAIN} 关闭、开启、重启 Hysteria 2"
     echo -e " ${GREEN}4.${PLAIN} 修改 Hysteria 2 配置"
     echo -e " ${GREEN}5.${PLAIN} 显示 Hysteria 2 配置文件"
-    echo -e " ${GREEN}6.${PLAIN} 更新 Hysieria2 内核方式1（官方）"
-    echo -e " ${GREEN}7.${PLAIN} 更新 Hysieria2 内核方式2（脚本）"
-    echo -e " ${GREEN}8.${PLAIN} 查询 Hysieria2 运行状态"
+    echo -e " ${GREEN}6.${PLAIN} 更新 Hysieria 2 内核方式1（官方）"
+    echo -e " ${GREEN}7.${PLAIN} 更新 Hysieria 2 内核方式2（脚本）"
+    echo -e " ${GREEN}8.${PLAIN} 查询 Hysieria 2 运行状态"
     echo " -------------"
     echo -e " ${GREEN}0.${PLAIN} 退出脚本"
     echo ""
