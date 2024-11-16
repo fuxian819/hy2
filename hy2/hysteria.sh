@@ -484,8 +484,9 @@ showconf(){
 update_hysteria(){
         systemctl stop hysteria
         rm -f /usr/local/bin/hysteria
-        wget -N --no-check-certificate https://github.com/apernet/Hysteria/releases/download/${last_version}/Hysteria-linux-$(archAffix) -O /usr/local/bin/hysteria
-        chmod +x /usr/local/bin/hysteria
+       # wget -N --no-check-certificate https://github.com/apernet/Hysteria/releases/download/${last_version}/Hysteria-linux-$(archAffix) -O /usr/local/bin/hysteria
+       # chmod +x /usr/local/bin/hysteria
+       bash <(curl -fsSL https://get.hy2.sh/)
         green "Hysteria 内核已更新到最新版本！"        
         systemctl start hysteria
         green "Hysteria 内核已重新启动！"
