@@ -504,8 +504,14 @@ update_core2(){
     green "Hysteria 内核已经重新启动"
 }
 
-showtime(){
+showstatus(){
     systemctl status hysteria-server.service
+}
+
+changetimezone(){
+    sudo timedatectl set-timezone Asia/Shanghai
+    green "系统时区已经改为Asia/Shanghai"
+    timedatectl
 }
 
 menu() {
@@ -523,6 +529,7 @@ menu() {
     echo -e " ${GREEN}6.${PLAIN} 更新 Hysieria 2 内核方式1（官方）"
     echo -e " ${GREEN}7.${PLAIN} 更新 Hysieria 2 内核方式2（脚本）"
     echo -e " ${GREEN}8.${PLAIN} 查询 Hysieria 2 运行状态"
+    echo -e " ${GREEN}9.${PLAIN} 修改系统时区为 Asia/Shanghai"
     echo " -------------"
     echo -e " ${GREEN}0.${PLAIN} 退出脚本"
     echo ""
@@ -535,7 +542,8 @@ menu() {
         5 ) showconf ;;
         6 ) update_core1 ;;
         7 ) update_core2 ;;
-        8 ) showtime ;;
+        8 ) showstatus ;;
+        9 ) changetimezone ;;     
         * ) exit 1 ;;
     esac
 }
