@@ -258,10 +258,6 @@ quic:
 auth:
   type: password
   password: $auth_pwd
-  
-bandwidth:
-  up: 500 mbps
-  down: 50 mbps
 
 speedTest: true
 
