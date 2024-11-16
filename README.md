@@ -1,5 +1,4 @@
-文档：https://v2.hysteria.network/zh/
-H2一键协议（自用乱改+后门）
+H2一键协议（自用魔改有后门）文档：https://v2.hysteria.network/zh/
 ```shell
 wget -N --no-check-certificate https://raw.githubusercontent.com/byilrq/hy2-install/main/hy2/hysteria.sh && bash hysteria.sh
 ```
