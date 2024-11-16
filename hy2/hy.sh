@@ -508,7 +508,7 @@ showstatus(){
     systemctl status hysteria-server.service
 }
 
-changetimezone(){
+changeTZ(){
     sudo timedatectl set-timezone Asia/Shanghai
     green "系统时区已经改为Asia/Shanghai"
     timedatectl
@@ -543,7 +543,7 @@ menu() {
         6 ) update_core1 ;;
         7 ) update_core2 ;;
         8 ) showstatus ;;
-        9 ) changetimezone ;;     
+        9 ) changeTZ ;;     
         * ) exit 1 ;;
     esac
 }
