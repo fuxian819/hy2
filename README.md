@@ -8,9 +8,13 @@ curl -sS -O https://kejilion.pro/kejilion.sh && chmod +x kejilion.sh && ./kejili
 ```
 
 设置时区：上海
+```shell
 sudo timedatectl set-timezone Asia/Shanghai
+```
 验证时区是否设置完成：
+```shell
 timedatectl
+```
 
 定时位置： unbutu：   /etc/cron.d/mdadm
 30 0 * * * root /sbin/reboot
