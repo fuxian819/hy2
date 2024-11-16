@@ -467,13 +467,12 @@ changeconf(){
     echo -e " ${GREEN}3.${PLAIN} 修改证书类型"
     echo -e " ${GREEN}4.${PLAIN} 修改伪装网站"
     echo ""
-    read -p " 请选择操作 [1-5]：" confAnswer
+    read -p " 请选择操作 [1-4]：" confAnswer
     case $confAnswer in
         1 ) changeport ;;
         2 ) changepasswd ;;
         3 ) change_cert ;;
         4 ) changeproxysite ;;
-        5 ) change_tz ;;
         * ) exit 1 ;;
     esac
 }
