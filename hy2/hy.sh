@@ -454,12 +454,19 @@ changeproxysite(){
     green "Hysteria 2 节点伪装网站已成功修改为：$proxysite"
 }
 
+change_tz(){
+    sudo timedatectl set-timezone Asia/Shanghai
+    green "系统时区已经改为Asia/Shanghai"
+    timedatectl
+}
+
 changeconf(){
     green "Hysteria 2 配置变更选择如下:"
     echo -e " ${GREEN}1.${PLAIN} 修改端口"
     echo -e " ${GREEN}2.${PLAIN} 修改密码"
     echo -e " ${GREEN}3.${PLAIN} 修改证书类型"
     echo -e " ${GREEN}4.${PLAIN} 修改伪装网站"
+    echo -e " ${GREEN}5.${PLAIN} 修改时区"
     echo ""
     read -p " 请选择操作 [1-4]：" confAnswer
     case $confAnswer in
@@ -467,6 +474,7 @@ changeconf(){
         2 ) changepasswd ;;
         3 ) change_cert ;;
         4 ) changeproxysite ;;
+        5 ) change_tz ;;
         * ) exit 1 ;;
     esac
 }
@@ -508,11 +516,6 @@ showstatus(){
     systemctl status hysteria-server.service
 }
 
-changeTZ(){
-    sudo timedatectl set-timezone Asia/Shanghai
-    green "系统时区已经改为Asia/Shanghai"
-    timedatectl
-}
 
 menu() {
     clear
@@ -544,7 +547,7 @@ menu() {
         6 ) showconf ;;
         7 ) update_core1 ;;
         8 ) update_core2 ;;
-        9 ) changeTZ ;;     
+        9 ) change_tz ;;     
         * ) exit 1 ;;
     esac
 }
