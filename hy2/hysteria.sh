@@ -466,7 +466,6 @@ changeconf(){
     echo -e " ${GREEN}2.${PLAIN} 修改密码"
     echo -e " ${GREEN}3.${PLAIN} 修改证书类型"
     echo -e " ${GREEN}4.${PLAIN} 修改伪装网站"
-    echo -e " ${GREEN}5.${PLAIN} 修改时区"
     echo ""
     read -p " 请选择操作 [1-5]：" confAnswer
     case $confAnswer in
@@ -532,7 +531,7 @@ menu() {
     echo -e " ${GREEN}6.${PLAIN} 查询 Hysieria 2 运行状态"
     echo -e " ${GREEN}7.${PLAIN} 更新 Hysieria 2 内核方式1（官方）"
     echo -e " ${GREEN}8.${PLAIN} 更新 Hysieria 2 内核方式2（脚本）"
-    echo -e " ${GREEN}9.${PLAIN} 更新 上海时区"
+    echo -e " ${GREEN}9.${PLAIN} 更新 系统时区为上海"
     echo " ---------------------------------------------------"
     echo -e " ${GREEN}0.${PLAIN} 退出脚本"
     echo ""
