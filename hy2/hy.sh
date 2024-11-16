@@ -530,11 +530,11 @@ menu() {
     echo " -------------------------------------------------------------"        
     echo -e " ${GREEN}7.${PLAIN} 更新 Hysieria 2 内核方式1（官方）"
     echo -e " ${GREEN}8.${PLAIN} 更新 Hysieria 2 内核方式2（脚本）"
-    echo -e " ${GREEN}9.${PLAIN} 修改系统时区为 Asia/Shanghai"
+    echo -e " ${GREEN}9.${PLAIN} 更新 系统时区"
     echo " --------------------------------------------------------------"
     echo -e " ${GREEN}0.${PLAIN} 退出脚本"
     echo ""
-    read -rp "请输入选项 [0-5]: " menuInput
+    read -rp "请输入选项 [0-9]: " menuInput
     case $menuInput in
         1 ) insthysteria ;;
         2 ) unsthysteria ;;
