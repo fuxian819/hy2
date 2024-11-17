@@ -6,6 +6,5 @@ wget -N --no-check-certificate https://raw.githubusercontent.com/byilrq/hy2/main
 ```shell
 curl -sS -O https://kejilion.pro/kejilion.sh && chmod +x kejilion.sh && ./kejilion.sh
 ```
-
-定时位置： unbutu：   /etc/cron.d/mdadm
+定时文件:mdadm    位置：/etc/cron.d/mdadm
 30 0 * * * root /sbin/reboot
